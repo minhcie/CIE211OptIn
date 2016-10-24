@@ -1,0 +1,16 @@
+Manifest-Version: 1.0
+Main-Class: src.main.java.CIE211OptIn
+Class-Path: .
+            lib/force-wsc-36.2.0.jar
+            lib/itext-2.1.7.jar
+            lib/jersey-client-1.18.jar
+            lib/jersey-core-1.18.jar
+            lib/json-simple-1.1.1.jar
+            lib/jsr311-api-1.1.1.jar
+            lib/log4j-1.2.9.jar
+            lib/partner.jar
+            lib/poi-3.11-20141221.jar
+            lib/poi-ooxml-3.11-20141221.jar
+            lib/poi-ooxml-schemas-3.11-20141221.jar
+            lib/postgresql-9.4-1201.jdbc41.jar
+            lib/xmlbeans-2.6.0.jar
