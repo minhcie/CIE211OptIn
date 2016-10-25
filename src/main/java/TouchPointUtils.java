@@ -23,7 +23,13 @@ public class TouchPointUtils {
         intake(791),
         calFreshEnrollment(793),
         calFreshDenial(794),
-        calFreshApproval(795);
+        calFreshApproval(795),
+        comboEnrollment(796),
+        comboDenial(797),
+        comboApproval(798),
+        mediCalEnrollment(799),
+        mediCalDenial(800),
+        mediCalApproval(800);
 
         int value;
         SD211Programs(int v) {
@@ -34,26 +40,71 @@ public class TouchPointUtils {
         }
     }
 
-    private static int getProgramId(String status) {
+    private static int getProgramId(String appType, String appStatus) {
         int programId = 0;
-        if (status == null || status.length() <= 0) {
+        if (appType == null || appType.length() <= 0) {
+            log.error("Trying to get 211 SD program ID without application type");
+            return programId;
+        }
+
+        if (appStatus == null || appStatus.length() <= 0) {
             log.error("Trying to get 211 SD program ID without application status");
             return programId;
         }
 
-        String appStatus = status.toLowerCase();
-        switch (appStatus) {
-            case "pending":
-                programId = SD211Programs.calFreshEnrollment.getValue();
+        String aType = appType.toLowerCase();
+        String status = appStatus.toLowerCase();
+        switch (aType) {
+            case "calfresh":
+                switch (status) {
+                    case "pending":
+                        programId = SD211Programs.calFreshEnrollment.getValue();
+                        break;
+                    case "denied":
+                        programId = SD211Programs.calFreshDenial.getValue();
+                        break;
+                    case "approved":
+                        programId = SD211Programs.calFreshApproval.getValue();
+                        break;
+                    default:
+                        log.error("Invalid application status: " + appStatus);
+                        break;
+                }
                 break;
-            case "denied":
-                programId = SD211Programs.calFreshDenial.getValue();
+            case "combo":
+                switch (status) {
+                    case "pending":
+                        programId = SD211Programs.comboEnrollment.getValue();
+                        break;
+                    case "denied":
+                        programId = SD211Programs.comboDenial.getValue();
+                        break;
+                    case "approved":
+                        programId = SD211Programs.comboApproval.getValue();
+                        break;
+                    default:
+                        log.error("Invalid application status: " + appStatus);
+                        break;
+                }
                 break;
-            case "approved":
-                programId = SD211Programs.calFreshApproval.getValue();
+            case "medi-cal":
+                switch (status) {
+                    case "pending":
+                        programId = SD211Programs.mediCalEnrollment.getValue();
+                        break;
+                    case "denied":
+                        programId = SD211Programs.mediCalDenial.getValue();
+                        break;
+                    case "approved":
+                        programId = SD211Programs.mediCalApproval.getValue();
+                        break;
+                    default:
+                        log.error("Invalid application status: " + appStatus);
+                        break;
+                }
                 break;
             default:
-                log.error("Invalid application status: " + status);
+                log.error("Invalid application type: " + appType);
                 break;
         }
         return programId;
@@ -190,7 +241,7 @@ public class TouchPointUtils {
                                           long clientId, long participantId,
                                           SfProgramInfo data, String appStatus) throws Exception {
         // Find ETO program id from application status.
-        int programId = getProgramId(appStatus);
+        int programId = getProgramId(data.appType, appStatus);
         if (programId == 0) {
             log.error("ETO program id not found while trying to add new enrollment");
             return null;
@@ -258,7 +309,7 @@ public class TouchPointUtils {
         JSONObject input = new JSONObject();
 
         // Find ETO program id from application status.
-        int programId = getProgramId(appStatus);
+        int programId = getProgramId(data.appType, appStatus);
         if (programId == 0) {
             log.error("ETO program id not found while trying to update");
             return;
@@ -406,7 +457,7 @@ public class TouchPointUtils {
         log.info("Adding supplemental demographics, client id: " + clientId);
 
         // Find ETO program id from application status.
-        int programId = getProgramId(data.appStatus);
+        int programId = getProgramId(data.appType, data.appStatus);
         if (programId == 0) {
             log.error("ETO program id not found while trying to add supplemental demographics");
             return;

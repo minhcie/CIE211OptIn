@@ -377,10 +377,15 @@ public class CIE211OptIn {
 
         // Add/update program info.
         List<SfProgramInfo> prgms = SfUtils.queryClientPrograms(connection, contactRecordTypeId,
-                                                                data.caseNumber, "CalFresh");
+                                                                data.caseNumber);
         if (prgms != null && prgms.size()  > 0) {
             for (int i = 0; i < prgms.size(); i++) {
                 SfProgramInfo pi = prgms.get(i);
+                if (!pi.appType.equalsIgnoreCase("calfresh") &&
+                    !pi.appType.equalsIgnoreCase("medi-cal") &&
+                    !pi.appType.equalsIgnoreCase("combo")) {
+                    continue;
+                }
 
                 // Make sure there is a valid application.
                 if (pi.appType == null || pi.appDate == null || pi.appStatus == null) {

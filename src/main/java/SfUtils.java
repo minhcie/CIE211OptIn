@@ -128,8 +128,7 @@ public class SfUtils {
 
     public static List<SfProgramInfo> queryClientPrograms(PartnerConnection conn,
                                                           String contactRecordTypeId,
-                                                          String contactId,
-                                                          String applicationType) {
+                                                          String contactId) {
     	log.info("Querying client programs...");
         List<SfProgramInfo> results = new ArrayList<SfProgramInfo>();
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
@@ -144,9 +143,6 @@ public class SfUtils {
     		sb.append("FROM Program__c ");
     		sb.append("WHERE Client__r.RecordTypeId = '" + contactRecordTypeId + "' ");
     		sb.append("  AND Client__r.Id = '" + contactId + "' ");
-            if (applicationType != null && applicationType.trim().length() > 0) {
-                sb.append("  AND Application_Type__c = '" + applicationType + "' ");
-            }
 
     		QueryResult queryResults = conn.query(sb.toString());
     		if (queryResults.getSize() > 0) {
