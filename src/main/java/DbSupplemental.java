@@ -17,13 +17,14 @@ public class DbSupplemental {
     public int householdSize;
     public String monthlyIncome;
     public String incomeSource;
+    public String language;
 
     public void insert(Connection conn) {
         try {
             StringBuffer sb = new StringBuffer();
             sb.append("INSERT INTO client_supplemental (clientId, numberInHousehold, ");
-            sb.append("housingStatus, incomeAmount, incomeSource) ");
-            sb.append("VALUES (?, ?, ?, ?, ?)");
+            sb.append("housingStatus, incomeAmount, incomeSource, primaryLanguage) ");
+            sb.append("VALUES (?, ?, ?, ?, ?, ?)");
 
             PreparedStatement ps = conn.prepareStatement(sb.toString(),
                                                          Statement.RETURN_GENERATED_KEYS);
@@ -40,6 +41,7 @@ public class DbSupplemental {
             }
             ps.setString(4, SqlString.encode(this.monthlyIncome));
             ps.setString(5, SqlString.encode(this.incomeSource));
+            ps.setString(6, SqlString.encode(this.language));
 
             int out = ps.executeUpdate();
             if (out == 0) {
@@ -64,8 +66,9 @@ public class DbSupplemental {
     public void update(Connection conn) {
         try {
             StringBuffer sb = new StringBuffer();
-            sb.append("UPDATE client_supplemental SET numberInHousehold = ?, housingStatus = ?, ");
-            sb.append("incomeAmount = ?, incomeSource = ?, modified = ? ");
+            sb.append("UPDATE client_supplemental SET numberInHousehold = ?, ");
+            sb.append("housingStatus = ?, incomeAmount = ?, incomeSource = ?, ");
+            sb.append("primaryLanguage = ?, modified = ? ");
             sb.append("WHERE id = ?");
 
             PreparedStatement ps = conn.prepareStatement(sb.toString());
@@ -81,13 +84,14 @@ public class DbSupplemental {
             }
             ps.setString(3, SqlString.encode(this.monthlyIncome));
             ps.setString(4, SqlString.encode(this.incomeSource));
+            ps.setString(5, SqlString.encode(this.language));
 
             // last modified date time.
             Date now = new Date();
             java.sql.Date sqlDate = new java.sql.Date(now.getTime());
-            ps.setDate(5, sqlDate);
+            ps.setDate(6, sqlDate);
 
-            ps.setLong(6, this.id);
+            ps.setLong(7, this.id);
 
             int out = ps.executeUpdate();
             if (out == 0) {
@@ -108,7 +112,7 @@ public class DbSupplemental {
         try {
             StringBuffer sb = new StringBuffer();
             sb.append("SELECT id, clientId, numberInHousehold, housingStatus, ");
-            sb.append("incomeAmount, incomeSource ");
+            sb.append("incomeAmount, incomeSource, primaryLanguage ");
             sb.append("FROM client_supplemental ");
             sb.append("WHERE clientId = " + clientId);
 
@@ -121,6 +125,7 @@ public class DbSupplemental {
                 result.householdSize = rs.getInt("numberInHousehold");
                 result.monthlyIncome = rs.getString("incomeAmount");
                 result.incomeSource = rs.getString("incomeSource");
+                result.language = rs.getString("primaryLanguage");
             }
 
             rs.close();

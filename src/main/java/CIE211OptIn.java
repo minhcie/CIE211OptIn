@@ -246,6 +246,9 @@ public class CIE211OptIn {
         input.put("State", data.state);
         input.put("ZipCode", data.postalCode);
         input.put("CaseNumber", data.caseNumber);
+        input.put("HomePhone", data.homePhone);
+        input.put("CellPhone", data.cellPhone);
+        input.put("EMail", data.email);
 
         // Custom demographics.
         JSONArray custList = new JSONArray();
@@ -290,16 +293,55 @@ public class CIE211OptIn {
         custList.add(cust);
 
         // Ethnicity (HUD).
+        long ethnicityId = 0; // Should match id from data_quality_choice table.
         cust = new JSONObject();
         cust.put("CDID", new Integer(3759));
         cust.put("CharacteristicType", new Integer(4));
-        cust.put("value", new Integer(8964)); // Unknown.
+        String race = data.race.toLowerCase();
+        if (race.contains("caucasian") || race.contains("white") ||
+            race.contains("non-hispanic") || race.contains("non-latino") ||
+            race.contains("african american") || race.contains("black") ||
+            race.contains("asian")) {
+            cust.put("value", new Integer(8960));
+            ethnicityId = 16;
+        }
+        else if (race.contains("hispanic") || race.contains("latino")) {
+            cust.put("value", new Integer(8961));
+            ethnicityId = 17;
+        }
+        else {
+            cust.put("value", new Integer(8964));
+            ethnicityId = 20; // Not collected.
+        }
+        custList.add(cust);
 
         // Race (HUD).
+        long raceId = 0; // Should match id from race table.
         cust = new JSONObject();
         cust.put("CDID", new Integer(3763));
         cust.put("CharacteristicType", new Integer(5));
-        cust.put("value", new Integer(8982)); // Unknown.
+        if (race.contains("caucasian") || race.contains("white")) {
+            cust.put("value", new Integer(8979));
+            raceId = 11;
+        }
+        else if (race.contains("hispanic") || race.contains("latino") ||
+                 race.contains("other race")) {
+            cust.put("value", new Integer(8982));
+            raceId = 12;
+        }
+        else if (race.contains("african american") || race.contains("black")) {
+            cust.put("value", new Integer(8977));
+            raceId = 13;
+        }
+        else if (race.contains("asian")) {
+            cust.put("value", new Integer(8976));
+            raceId = 14;
+        }
+        else {
+            cust.put("value", new Integer(8982));
+            raceId = 17; // Unknown.
+        }
+        custList.add(cust);
 
         // Include in standard demographics.
         input.put("CustomDemoData", custList);
@@ -359,6 +401,13 @@ public class CIE211OptIn {
         client.dob = data.dob;
         client.address1 = data.address1;
         client.address2 = data.address2;
+        client.city = data.city;
+        client.state = data.state;
+        client.postalCode = data.postalCode;
+        client.homePhone = data.homePhone;
+        client.cellPhone = data.cellPhone;
+        client.email = data.email;
+        client.ethnicityId = ethnicityId;
         client.etoEnterpriseId = UUID.fromString(guid);
         client.etoParticipantSiteId = participantId;
         client.etoSubjectId = subjectId;
@@ -375,69 +424,90 @@ public class CIE211OptIn {
             client.update(sqlConn);
         }
 
+        // Add client race.
+        DbClientRace cr = DbClientRace.findByClientRace(sqlConn, client.id, raceId);
+        if (cr == null) {
+            log.info("DbClientRace.insert()");
+            cr = new DbClientRace();
+            cr.clientId = client.id;
+            cr.raceId = raceId;
+            cr.insert(sqlConn);
+        }
+
         // Add/update program info.
-        List<SfProgramInfo> prgms = SfUtils.queryClientPrograms(connection, contactRecordTypeId,
+        List<SfProgramInfo> prgms = SfUtils.queryClientPrograms(connection,
+                                                                contactRecordTypeId,
                                                                 data.caseNumber);
         if (prgms != null && prgms.size()  > 0) {
             for (int i = 0; i < prgms.size(); i++) {
                 SfProgramInfo pi = prgms.get(i);
-                if (!pi.appType.equalsIgnoreCase("calfresh") &&
-                    !pi.appType.equalsIgnoreCase("medi-cal") &&
-                    !pi.appType.equalsIgnoreCase("combo")) {
-                    continue;
-                }
 
-                // Make sure there is a valid application.
-                if (pi.appType == null || pi.appDate == null || pi.appStatus == null) {
+                // Make sure we have a valid application.
+                if (pi.appType == null || pi.appStatus == null || pi.appDate == null) {
                     log.error("Trying to add/update program with invalid application");
                     continue;
                 }
 
-                DbEnrollment enroll = null;
-                String appStatus = pi.appStatus.toLowerCase();
-                switch (appStatus) {
-                    case "pending":
-                        // Add new pending program with start date = application date.
-                        TouchPointUtils.addProgram(sqlConn, auth, client.id,
-                                                   participantId, pi, "pending");
-                        break;
-                    case "denied":
-                        // Add/update pending program with start date = application
-                        // date, end date = application last modified date.
-                        TouchPointUtils.updateProgram(sqlConn, auth, client.id,
-                                                      participantId, pi, "pending");
+                String prgmName = pi.appType.toLowerCase();
+                switch (prgmName) {
+                    case "calfresh":
+                    case "medi-cal":
+                    case "combo":
+                        // Insert update program info.
+                        upsertEnrollmentPrograms(sqlConn, auth, client.id,
+                                                 participantId, pi);
 
-                        // Add denied program with start date = application date,
-                        // end date = application last modified date.
-                        enroll = TouchPointUtils.addProgram(sqlConn, auth, client.id,
-                                                            participantId, pi, "denied");
-                        if (enroll != null) {
-                            // Update denied program with end date = application
-                            // last modified date, dismissal reason.
-                            TouchPointUtils.updateProgram(sqlConn, auth, client.id,
-                                                          participantId, pi, "denied");
-                        }
-                        break;
-                    case "approved":
-                        // Add/update pending program with start date = application
-                        // date, end date = application last modified date.
-                        TouchPointUtils.updateProgram(sqlConn, auth, client.id,
-                                                      participantId, pi, "pending");
-
-                        // Add approved program with start date = beginning date
-                        // of aid (BDA), end date = null.
-                        TouchPointUtils.addProgram(sqlConn, auth, client.id,
-                                                   participantId, pi, "approved");
+                        // Add client supplemental demographics.
+                        TouchPointUtils.addSupplemental(sqlConn, auth, client.id, subjectId, pi);
                         break;
                     default:
-                        continue;
+                        break;
                 }
-
-                // Add client supplemental demographics.
-                TouchPointUtils.addSupplemental(sqlConn, auth, client.id, subjectId, pi);
             }
         }
-        /*
-        */
+    }
+
+    private static void upsertEnrollmentPrograms(Connection sqlConn, EtoAuthentication auth,
+                                                 long clientId, long participantId,
+                                                 SfProgramInfo pi) throws Exception {
+        DbEnrollment enroll = null;
+        String appStatus = pi.appStatus.toLowerCase();
+        switch (appStatus) {
+            case "pending":
+                // Add new pending program with start date = application date.
+                TouchPointUtils.addProgram(sqlConn, auth, clientId,
+                                           participantId, pi, "pending");
+                break;
+            case "denied":
+                // Add/update pending program with start date = application
+                // date, end date = application last modified date.
+                TouchPointUtils.updateProgram(sqlConn, auth, clientId,
+                                              participantId, pi, "pending");
+
+                // Add denied program with start date = application date,
+                // end date = application last modified date.
+                enroll = TouchPointUtils.addProgram(sqlConn, auth, clientId,
+                                                    participantId, pi, "denied");
+                if (enroll != null) {
+                    // Update denied program with end date = application
+                    // last modified date, dismissal reason.
+                    TouchPointUtils.updateProgram(sqlConn, auth, clientId,
+                                                  participantId, pi, "denied");
+                }
+                break;
+            case "approved":
+                // Add/update pending program with start date = application
+                // date, end date = application last modified date.
+                TouchPointUtils.updateProgram(sqlConn, auth, clientId,
+                                              participantId, pi, "pending");
+
+                // Add approved program with start date = beginning date
+                // of aid (BDA), end date = null.
+                TouchPointUtils.addProgram(sqlConn, auth, clientId,
+                                           participantId, pi, "approved");
+                break;
+            default:
+                break;
+        }
     }
 }

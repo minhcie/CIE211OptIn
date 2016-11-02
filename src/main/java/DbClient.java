@@ -28,20 +28,26 @@ public class DbClient {
     public String city;
     public String state;
     public String postalCode;
+    public String homePhone;
+    public String cellPhone;
+    public String email;
+    public long ethnicityId;
     public boolean active = true;
     public UUID etoEnterpriseId;
     public long etoParticipantSiteId;
     public long etoSubjectId;
+    public String race;
 
     public Date consentDate = null;
 
     public void insert(Connection conn) {
         try {
             StringBuffer sb = new StringBuffer();
-            sb.append("INSERT INTO client (organizationId, genderId, firstName, lastName, ");
-            sb.append("dob, ssn, caseNumber, address1, address2, city, state, postalCode, ");
+            sb.append("INSERT INTO client (organizationId, genderId, firstName, ");
+            sb.append("lastName, dob, ssn, caseNumber, address1, address2, city, ");
+            sb.append("state, postalCode, homePhone, cellPhone, email, ethnicity, ");
             sb.append("active, etoEnterpriseId, etoParticipantSiteId, etoSubjectId) ");
-            sb.append("VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::uuid, ?, ?)");
+            sb.append("VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::uuid, ?, ?)");
 
             PreparedStatement ps = conn.prepareStatement(sb.toString(),
                                                          Statement.RETURN_GENERATED_KEYS);
@@ -63,10 +69,14 @@ public class DbClient {
             ps.setString(10, SqlString.encode(this.city));
             ps.setString(11, SqlString.encode(this.state));
             ps.setString(12, SqlString.encode(this.postalCode));
-            ps.setBoolean(13, this.active);
-            ps.setObject(14, this.etoEnterpriseId);
-            ps.setLong(15, this.etoParticipantSiteId);
-            ps.setLong(16, this.etoSubjectId);
+            ps.setString(13, SqlString.encode(this.homePhone));
+            ps.setString(14, SqlString.encode(this.cellPhone));
+            ps.setString(15, SqlString.encode(this.email));
+            ps.setLong(16, this.ethnicityId);
+            ps.setBoolean(17, this.active);
+            ps.setObject(18, this.etoEnterpriseId);
+            ps.setLong(19, this.etoParticipantSiteId);
+            ps.setLong(20, this.etoSubjectId);
 
             int out = ps.executeUpdate();
             if (out == 0) {
@@ -93,8 +103,9 @@ public class DbClient {
             StringBuffer sb = new StringBuffer();
             sb.append("UPDATE client SET organizationId = ?, genderId = ?, firstName = ?, ");
             sb.append("lastName = ?, dob = ?, ssn = ?, caseNumber = ?, address1 = ?, ");
-            sb.append("address2 = ?, city = ?, state = ?, postalCode = ?, active = ?, ");
-            sb.append("etoEnterpriseId = ?, etoParticipantSiteId = ?, etoSubjectId = ? ");
+            sb.append("address2 = ?, city = ?, state = ?, postalCode = ?, homePhone = ?, ");
+            sb.append("cellPhone = ?, email = ?, ethnicity = ?, active = ?, etoEnterpriseId = ?, ");
+            sb.append("etoParticipantSiteId = ?, etoSubjectId = ? ");
             sb.append("WHERE id = " + this.id);
 
             PreparedStatement ps = conn.prepareStatement(sb.toString());
@@ -116,10 +127,14 @@ public class DbClient {
             ps.setString(10, SqlString.encode(this.city));
             ps.setString(11, SqlString.encode(this.state));
             ps.setString(12, SqlString.encode(this.postalCode));
-            ps.setBoolean(13, this.active);
-            ps.setObject(14, this.etoEnterpriseId);
-            ps.setLong(15, this.etoParticipantSiteId);
-            ps.setLong(16, this.etoSubjectId);
+            ps.setString(13, SqlString.encode(this.homePhone));
+            ps.setString(14, SqlString.encode(this.cellPhone));
+            ps.setString(15, SqlString.encode(this.email));
+            ps.setLong(16, this.ethnicityId);
+            ps.setBoolean(17, this.active);
+            ps.setObject(18, this.etoEnterpriseId);
+            ps.setLong(19, this.etoParticipantSiteId);
+            ps.setLong(20, this.etoSubjectId);
 
             int out = ps.executeUpdate();
             if (out == 0) {

@@ -45,7 +45,8 @@ public class SfUtils {
     		StringBuilder sb = new StringBuilder();
     		sb.append("SELECT Id, FirstName, LastName, Birthdate, Gender_Identity__c, ");
     		sb.append("SSN__c, Mailing_Street__c, Mailing_Apt_Num__c, Mailing_City__c, ");
-    		sb.append("Mailing_State__c, Mailing_Zip__c, CIE_Client__c, CIE_Opt_In__c, ");
+    		sb.append("Mailing_State__c, Mailing_Zip__c, Phone_1_Primary__c, Phone_2__c, ");
+    		sb.append("Email, Race__c, CIE_Client__c, CIE_Opt_In__c, ");
     		sb.append("CreatedDate ");
     		sb.append("FROM Contact ");
     		sb.append("WHERE RecordTypeId = '" + contactRecordTypeId + "' ");
@@ -98,6 +99,10 @@ public class SfUtils {
                     c.city = (String)s.getField("Mailing_City__c");
                     c.state = (String)s.getField("Mailing_State__c");
                     c.postalCode = (String)s.getField("Mailing_Zip__c");
+                    c.homePhone = (String)s.getField("Phone_1_Primary__c");
+                    c.cellPhone = (String)s.getField("Phone_2__c");
+                    c.email = (String)s.getField("Email");
+                    c.race = (String)s.getField("Race__c");
 
                     str = (String)s.getField("CreatedDate");
                     if (str != null && str.trim().length() > 0) {
@@ -135,76 +140,175 @@ public class SfUtils {
 
         try {
     		StringBuilder sb = new StringBuilder();
-    		sb.append("SELECT Id, Name, RecordType.Name, LastModifiedDate, Applicant_Name__c, ");
-    		sb.append("Application_Type__c, Application_Date__c, Application_Status__c, ");
-    		sb.append("Reason_Incomplete__c, Beginning_Date_of_Aid_BDA__c, Denial_Reason__c, ");
-    		sb.append("Notes__c, MyBCW_Confirmation_Number__c, Current_Source_of_Income__c, ");
-    		sb.append("Monthly_Gross_Income__c, Number_People_in_Household__c, Documentation_Submitted__c ");
+    		sb.append("SELECT Id, Name, RecordType.Name, LastModifiedDate, ");
+    		sb.append("Applicant_Name__c, Application_Type__c, Application_Date__c, ");
+    		sb.append("Application_Status__c, Reason_Incomplete__c, Beginning_Date_of_Aid_BDA__c, ");
+    		sb.append("Denial_Reason__c, Notes__c, MyBCW_Confirmation_Number__c, ");
+    		sb.append("Current_Source_of_Income__c, Monthly_Gross_Income__c, ");
+            sb.append("Number_People_in_Household__c, Documentation_Submitted__c, ");
+            sb.append("Language__c, Project_Status__c, Caller_Caregiver_Name__c, ");
+            sb.append("Caller_Caregiver_Phone__c, Health_Insurance_Provider__c, ");
+            sb.append("Primary_Diagnosis__c, Do_you_have_a_primary_care_doctor__c, ");
+            sb.append("Recent_Hospitalizations_in_past_6_mo__c, Have_you_had_recent_falls_in_past_6_mo__c ");
     		sb.append("FROM Program__c ");
     		sb.append("WHERE Client__r.RecordTypeId = '" + contactRecordTypeId + "' ");
     		sb.append("  AND Client__r.Id = '" + contactId + "' ");
 
     		QueryResult queryResults = conn.query(sb.toString());
     		if (queryResults.getSize() > 0) {
-    			System.out.println("Found " + queryResults.getSize() + " programs");
+    			log.info("Found " + queryResults.getSize() + " programs");
     			for (SObject s: queryResults.getRecords()) {
                     SfProgramInfo pi = new SfProgramInfo();
                     pi.id = s.getId();
-    				System.out.println("Id: " + pi.id);
+    				log.info("Id: " + pi.id);
 
-                    pi.appType = (String)s.getField("Application_Type__c");
-    				System.out.println("App Type: " + pi.appType);
+    				String recType = (String)s.getChild("RecordType").getField("Name");
+                    if (recType.equalsIgnoreCase("application")) { // CalFresh, Medi-Cal.
+                        pi.appType = (String)s.getField("Application_Type__c");
+                        pi.appStatus = (String)s.getField("Application_Status__c");
+                    }
+                    else { // Health Nav programs.
+                        pi.appType = recType;
+                        pi.appStatus = (String)s.getField("Project_Status__c");
+                    }
+				    log.info("App Type: " + pi.appType);
+    				log.info("App Status: " + pi.appStatus);
 
                     String str = (String)s.getField("Application_Date__c");
                     if (str != null && str.trim().length() > 0) {
                         pi.appDate = sdf.parse(str);
-                        System.out.println("App Date: " + str);
+                        log.info("App Date: " + str);
                     }
 
-    				pi.appStatus = (String)s.getField("Application_Status__c");
-    				System.out.println("App Status: " + pi.appStatus);
     				pi.confirmationNumber = (String)s.getField("MyBCW_Confirmation_Number__c");
-    				System.out.println("County Confirmation Number: " + pi.confirmationNumber);
+    				//log.info("County Confirmation Number: " + pi.confirmationNumber);
 
     				str = (String)s.getField("Beginning_Date_of_Aid_BDA__c");
                     if (str != null && str.trim().length() > 0) {
                         pi.appDate = sdf.parse(str);
-                        System.out.println("BDA: " + str);
+                        //log.info("BDA: " + str);
                     }
 
     				pi.reasonIncomplete = (String)s.getField("Reason_Incomplete__c");
-    				System.out.println("Reason Incomplete: " + pi.reasonIncomplete);
+    				//log.info("Reason Incomplete: " + pi.reasonIncomplete);
     				pi.denialReason = (String)s.getField("Denial_Reason__c");
-    				System.out.println("Denial Reason: " + pi.denialReason);
+    				//log.info("Denial Reason: " + pi.denialReason);
     				pi.notes = (String)s.getField("Notes__c");
-    				System.out.println("Notes: " + pi.notes);
+    				//log.info("Notes: " + pi.notes);
     				pi.incomeSource = (String)s.getField("Current_Source_of_Income__c");
-    				System.out.println("Income Source: " + pi.incomeSource);
+    				//log.info("Income Source: " + pi.incomeSource);
     				pi.monthlyIncome = (String)s.getField("Monthly_Gross_Income__c");
-    				System.out.println("Monthly Income: " + pi.monthlyIncome);
+    				//log.info("Monthly Income: " + pi.monthlyIncome);
 
     				str = (String)s.getField("Number_People_in_Household__c");
                     if (str != null && str.trim().length() > 0) {
                         pi.householdSize = (int)Float.parseFloat(str);
-                        System.out.println("Household Size`: " + str);
+                        //log.info("Household Size: " + str);
                     }
 
     				str = (String)s.getField("LastModifiedDate");
                     if (str != null && str.trim().length() > 0) {
                         pi.lastModified = sdf.parse(str);
-                        System.out.println("Last Modified Date: " + str);
+                        //log.info("Last Modified Date: " + str);
                     }
 
     				pi.docSubmitted = (String)s.getField("Documentation_Submitted__c");
-    				System.out.println("Document Submitted: " + pi.docSubmitted);
+    				//log.info("Document Submitted: " + pi.docSubmitted);
+
+    				pi.language = (String)s.getField("Language__c");
+    				log.info("Language: " + pi.language);
+    				pi.careGiverName = (String)s.getField("Caller_Caregiver_Name__c");
+    				log.info("Care Giver Name: " + pi.careGiverName);
+    				pi.careGiverPhone = (String)s.getField("Caller_Caregiver_Phone__c");
+    				log.info("Care Giver Phone: " + pi.careGiverPhone);
+    				pi.insuranceProvider = (String)s.getField("Health_Insurance_Provider__c");
+    				log.info("Insurance Provider: " + pi.insuranceProvider);
+    				pi.primaryDiagnosis = (String)s.getField("Primary_Diagnosis__c");
+    				log.info("Diagnosis: " + pi.primaryDiagnosis);
+    				pi.primaryCareProvider = (String)s.getField("Do_you_have_a_primary_care_doctor__c");
+    				log.info("Care Provider: " + pi.primaryCareProvider);
+    				pi.timesHospital = (String)s.getField("Recent_Hospitalizations_in_past_6_mo__c");
+    				log.info("# times hospitalizations: " + pi.timesHospital);
+    				pi.timesFallen = (String)s.getField("Have_you_had_recent_falls_in_past_6_mo__c");
+    				log.info("# times fallen: " + pi.timesFallen);
 
                     // @debug.
                     /*
-    				System.out.println("Name: " + s.getField("Name"));
-    				System.out.println("RecordType.Name: " + s.getChild("RecordType").getField("Name"));
-    				System.out.println("App Name: " + s.getField("Applicant_Name__c"));
+    				log.info("Name: " + s.getField("Name"));
+    				log.info("App Name: " + s.getField("Applicant_Name__c"));
                     */
-    				System.out.println("-----");
+    				log.info("-----");
+
+                    // Add to result list.
+                    results.add(pi);
+    			}
+    		}
+        }
+        catch (Exception e) {
+            log.error(e.getMessage());
+            e.printStackTrace();
+        }
+
+        return results;
+    }
+
+    public static List<SfProgramInfo> queryRiskRatingScales(PartnerConnection conn,
+                                                            String contactRecordTypeId,
+                                                            String contactId) {
+    	log.info("Querying client risk rating scales...");
+        List<SfProgramInfo> results = new ArrayList<SfProgramInfo>();
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+
+        try {
+    		StringBuilder sb = new StringBuilder();
+    		sb.append("SELECT Id, Date_of_Assessment__c, LastModifiedDate, ");
+            sb.append("Adult_Daily_Living__c, Ambulance__c, Medication_Management__c, ");
+            sb.append("Housing__c, Income_Employment__c, Nutrition__c, Primary_Care__c, ");
+            sb.append("Social_Support__c, Transportation__c ");
+    		sb.append("FROM Risk_Rating_Scale__c ");
+    		sb.append("WHERE Client__r.RecordTypeId = '" + contactRecordTypeId + "' ");
+    		sb.append("  AND Client__r.Id = '" + contactId + "' ");
+    		//sb.append("  AND LastModifiedDate >= YESTERDAY ");
+
+    		QueryResult queryResults = conn.query(sb.toString());
+    		if (queryResults.getSize() > 0) {
+    			log.info("Found " + queryResults.getSize() + " programs");
+    			for (SObject s: queryResults.getRecords()) {
+                    SfProgramInfo pi = new SfProgramInfo();
+                    pi.id = s.getId();
+    				log.info("Id: " + pi.id);
+
+    				String str = (String)s.getField("Date_of_Assessment__c");
+                    if (str != null && str.trim().length() > 0) {
+                        pi.appDate = sdf.parse(str);
+                        log.info("Date of Assessment: " + str);
+                    }
+
+    				str = (String)s.getField("LastModifiedDate");
+                    if (str != null && str.trim().length() > 0) {
+                        pi.lastModified = sdf.parse(str);
+                        log.info("Last Modified Date: " + str);
+                    }
+
+    				pi.dailyLiving = (String)s.getField("Adult_Daily_Living__c");
+    				log.info("Adult Daily Living: " + pi.dailyLiving);
+    				pi.ambulance = (String)s.getField("Ambulance__c");
+    				log.info("Ambulance: " + pi.ambulance);
+    				pi.medication = (String)s.getField("Medication_Management__c");
+    				log.info("Medication Management: " + pi.medication);
+    				pi.housing = (String)s.getField("Housing__c");
+    				log.info("Housing: " + pi.housing);
+    				pi.incomeEmployment = (String)s.getField("Income_Employment__c");
+    				log.info("Income Employment: " + pi.incomeEmployment);
+    				pi.nutrition = (String)s.getField("Nutrition__c");
+    				log.info("Nutrition: " + pi.nutrition);
+    				pi.primaryCare = (String)s.getField("Primary_Care__c");
+    				log.info("Primary Care: " + pi.primaryCare);
+    				pi.socialSupport = (String)s.getField("Social_Support__c");
+    				log.info("Social Support: " + pi.socialSupport);
+    				pi.transportation = (String)s.getField("Transportation__c");
+    				log.info("Transportation: " + pi.transportation);
+    				log.info("-----");
 
                     // Add to result list.
                     results.add(pi);

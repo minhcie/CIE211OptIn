@@ -29,7 +29,11 @@ public class TouchPointUtils {
         comboApproval(798),
         mediCalEnrollment(799),
         mediCalDenial(800),
-        mediCalApproval(800);
+        mediCalApproval(801),
+        healthGeneral(802),
+        perinatal(803),
+        projectCare(804),
+        sharpReferrals(805);
 
         int value;
         SD211Programs(int v) {
@@ -102,6 +106,18 @@ public class TouchPointUtils {
                         log.error("Invalid application status: " + appStatus);
                         break;
                 }
+                break;
+            case "health general":
+                programId = SD211Programs.healthGeneral.getValue();
+                break;
+            case "perinatal":
+                programId = SD211Programs.perinatal.getValue();
+                break;
+            case "project care":
+                programId = SD211Programs.projectCare.getValue();
+                break;
+            case "sharp referrals":
+                programId = SD211Programs.sharpReferrals.getValue();
                 break;
             default:
                 log.error("Invalid application type: " + appType);
@@ -507,6 +523,9 @@ public class TouchPointUtils {
         // Income source.
         respElements.add(createTextRespElement(699, data.incomeSource));
 
+        // Primary language.
+        respElements.add(createTextRespElement(688, data.language));
+
         // Add response elements.
         input.put("ResponseElements", respElements);
 
@@ -537,6 +556,7 @@ public class TouchPointUtils {
             sup.householdSize = data.householdSize;
             sup.monthlyIncome = data.monthlyIncome;
             sup.incomeSource = data.incomeSource;
+            sup.language = data.language;
             sup.update(sqlConn);
         }
         else {
@@ -545,15 +565,178 @@ public class TouchPointUtils {
             sup.householdSize = data.householdSize;
             sup.monthlyIncome = data.monthlyIncome;
             sup.incomeSource = data.incomeSource;
+            sup.language = data.language;
             sup.insert(sqlConn);
+        }
+    }
+
+    public static void addRiskRatingScale(Connection sqlConn, EtoAuthentication auth,
+                                          long clientId, Long subjectId,
+                                          SfProgramInfo data) throws Exception {
+        log.info("Adding risk rating scale, client id: " + clientId);
+
+        // Find ETO program id from application status.
+        int programId = getProgramId(data.appType, data.appStatus);
+        if (programId == 0) {
+            log.error("ETO program id not found while trying to add risk rating scale");
+            return;
+        }
+
+        // Update session's current program before populating TouchPoint.
+        EtoServiceUtil.setCurrentProgram(programId, auth);
+
+        // ETO Risk Rating Scale TouchPoint.
+        JSONObject input = new JSONObject();
+        input.put("TouchPointID", new Integer(53));
+        input.put("SubjectID", subjectId);
+        Date now = new Date();
+        input.put("ResponseCreatedDate", "/Date(" + now.getTime() + ")/");
+        input.put("ProgramID", new Integer(programId));
+
+        // TouchPoint response elements.
+        JSONArray respElements = new JSONArray();
+
+        // Current living situation, housing.
+        JSONObject ele = createRiskRatingRespElement(803, 1236, data.housing);
+        if (ele != null) {
+            respElements.add(ele);
+        }
+
+        // Nutrition, healthly food.
+        ele = createRiskRatingRespElement(804, 1241, data.nutrition);
+        if (ele != null) {
+            respElements.add(ele);
+        }
+
+        // Primary care provider, medical home.
+        ele = createRiskRatingRespElement(805, 1246, data.primaryCare);
+        if (ele != null) {
+            respElements.add(ele);
+        }
+
+        // Health, medication management.
+        ele = createRiskRatingRespElement(806, 1251, data.medication);
+        if (ele != null) {
+            respElements.add(ele);
+        }
+
+        // Social support.
+        ele = createRiskRatingRespElement(807, 1256, data.socialSupport);
+        if (ele != null) {
+            respElements.add(ele);
+        }
+
+        // Activities of daily living.
+        ele = createRiskRatingRespElement(808, 1261, data.dailyLiving);
+        if (ele != null) {
+            respElements.add(ele);
+        }
+
+        // Ambulance, hospitalization.
+        ele = createRiskRatingRespElement(809, 1266, data.ambulance);
+        if (ele != null) {
+            respElements.add(ele);
+        }
+
+        // Income source, employment.
+        ele = createRiskRatingRespElement(810, 1271, data.incomeEmployment);
+        if (ele != null) {
+            respElements.add(ele);
+        }
+
+        // Transportation.
+        ele = createRiskRatingRespElement(811, 1276, data.transportation);
+        if (ele != null) {
+            respElements.add(ele);
+        }
+
+        // Date taken.
+        ele = new JSONObject();
+        ele.put("ElementID", new Integer(812));
+        ele.put("ElementType", new Integer(9));
+        if (data.appDate != null) {
+            SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yyyy");
+            ele.put("Value", sdf.format(data.appDate));
+        }
+        else {
+            ele.put("Value", null);
+        }
+        respElements.add(ele);
+
+        // Add response elements.
+        input.put("ResponseElements", respElements);
+
+        // Wrap request JSON string.
+        String jsonStr = input.toString("TouchPointResponse", input);
+        String inputStr = "{" + jsonStr + "}";
+
+        // @debug.
+        log.info(inputStr);
+
+        // Post request.
+        ClientResponse response = EtoServiceUtil.postRequest("https://services.etosoftware.com/API/TouchPoint.svc/TouchPointResponseAdd/",
+                                                             auth, inputStr);
+        if (response.getStatus() != 200) {
+            log.error(response.toString());
+        }
+        else {
+            // Parse response.
+            Long rrsId = EtoServiceUtil.parseResponse(response, "AddTouchPointResponseResult",
+                                                      "TouchPointResponseID");
+            log.info("Risk rating scale response ID: " + rrsId + "\n");
         }
     }
 
     private static JSONObject createTextRespElement(int elementId, String respText) {
         JSONObject ele = new JSONObject();
         ele.put("ElementID", new Integer(elementId));
-        ele.put("ElementType", new Integer(5));
+        ele.put("ElementType", new Integer(5)); // Free text answer.
         ele.put("Value", respText);
+        return ele;
+    }
+
+    private static JSONObject createRiskRatingRespElement(int elementId,
+                                                          int thrivingChoiceId,
+                                                          String respText) {
+        JSONObject ele = null;
+        if (respText == null || respText.trim().length() <= 0) {
+            return ele;
+        }
+
+        int riskRating = 0;
+        String str = respText.toLowerCase();
+        switch (str) {
+            case "crisis":
+                riskRating = 5;
+                break;
+            case "vulnerable":
+                riskRating = 4;
+                break;
+            case "stable":
+                riskRating = 3;
+                break;
+            case "safe":
+                riskRating = 2;
+                break;
+            case "thriving":
+                riskRating = 1;
+                break;
+            default:
+                break;
+        }
+
+        if (riskRating > 0) {
+            int choiceId = thrivingChoiceId - riskRating + 1;
+            JSONObject choice = new JSONObject();
+            choice.put("TouchPointElementChoiceID", new Integer(choiceId));
+            JSONArray respElementChoices = new JSONArray();
+            respElementChoices.add(choice);
+
+            ele = new JSONObject();
+            ele.put("ElementID", new Integer(elementId));
+            ele.put("ElementType", new Integer(4)); // Pick list answer.
+            ele.put("ResponseElementChoices", respElementChoices);
+        }
         return ele;
     }
 }
