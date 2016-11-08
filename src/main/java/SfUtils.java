@@ -2,6 +2,7 @@ package src.main.java;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 
 import com.sforce.soap.partner.PartnerConnection;
@@ -46,17 +47,18 @@ public class SfUtils {
     		sb.append("SELECT Id, FirstName, LastName, Birthdate, Gender_Identity__c, ");
     		sb.append("SSN__c, Mailing_Street__c, Mailing_Apt_Num__c, Mailing_City__c, ");
     		sb.append("Mailing_State__c, Mailing_Zip__c, Phone_1_Primary__c, Phone_2__c, ");
-    		sb.append("Email, Race__c, CIE_Client__c, CIE_Opt_In__c, ");
+    		sb.append("Email, Race__c, What_is_your_preferred_language__c, CIE_Client__c, CIE_Opt_In__c, ");
     		sb.append("CreatedDate ");
     		sb.append("FROM Contact ");
     		sb.append("WHERE RecordTypeId = '" + contactRecordTypeId + "' ");
     		sb.append("  AND CIE_Client__c = TRUE ");
     		sb.append("  AND CIE_Opt_In__c = TRUE ");
+    		sb.append("  AND Id = '003d000002prhl1' "); // Sample Sue.
     		//sb.append("  AND Id = '003d000003ADuSG' "); // Pending test client.
     		//sb.append("  AND Id = '003d00000397Tfu' "); // Denied test client.
     		//sb.append("  AND Id = '003d000003AAIjx' "); // Approved test client.
     		//sb.append("  AND LastModifiedDate >= LAST_N_DAYS:2 ");
-    		sb.append("  AND LastModifiedDate >= YESTERDAY ");
+    		//sb.append("  AND LastModifiedDate >= YESTERDAY ");
 
     		QueryResult queryResults = conn.query(sb.toString());
     		if (queryResults.getSize() > 0) {
@@ -65,19 +67,26 @@ public class SfUtils {
                     c.caseNumber = s.getId();
                     String first = (String)s.getField("FirstName");
                     String last = (String)s.getField("LastName");
-                    if (first == null || last == null) {
+                    String dob = (String)s.getField("Birthdate");
+                    if (first == null || first.trim().length() <= 0 ||
+                        last == null || last.trim().length() <= 0 ||
+                        dob == null || dob.trim().length() <= 0) {
+                        log.error("Either first name or last name or dob is missing from client record");
                         continue;
                     }
 
                     c.firstName = first;
                     c.lastName = last;
 
-                    String str = (String)s.getField("Birthdate");
-                    if (str != null && str.trim().length() > 0) {
-                        c.dob = sdf.parse(str);
-                    }
+                    Calendar cal = Calendar.getInstance();
+                    cal.setTime(sdf.parse(dob));
+                    cal.set(Calendar.HOUR, 0);
+                    cal.set(Calendar.MINUTE, 0);
+                    cal.set(Calendar.SECOND, 0);
+                    cal.set(Calendar.MILLISECOND, 0);
+                    c.dob = cal.getTime();
 
-                    str = (String)s.getField("Gender_Identity__c");
+                    String str = (String)s.getField("Gender_Identity__c");
                     if (str != null && str.trim().length() > 0) {
                         if (str.equalsIgnoreCase("women")) {
                             c.genderId = 1;
@@ -103,6 +112,7 @@ public class SfUtils {
                     c.cellPhone = (String)s.getField("Phone_2__c");
                     c.email = (String)s.getField("Email");
                     c.race = (String)s.getField("Race__c");
+                    c.language = (String)s.getField("What_is_your_preferred_language__c");
 
                     str = (String)s.getField("CreatedDate");
                     if (str != null && str.trim().length() > 0) {
@@ -117,6 +127,7 @@ public class SfUtils {
                     }
     				log.info("Gender: " + c.genderId);
     				log.info("Address: " + c.address1 + ", " + c.city + ", " + c.state + ", " + c.postalCode);
+    				log.info("Language: " + c.language);
 
                     // Add to result list.
                     results.add(c);
@@ -146,8 +157,8 @@ public class SfUtils {
     		sb.append("Denial_Reason__c, Notes__c, MyBCW_Confirmation_Number__c, ");
     		sb.append("Current_Source_of_Income__c, Monthly_Gross_Income__c, ");
             sb.append("Number_People_in_Household__c, Documentation_Submitted__c, ");
-            sb.append("Language__c, Project_Status__c, Caller_Caregiver_Name__c, ");
-            sb.append("Caller_Caregiver_Phone__c, Health_Insurance_Provider__c, ");
+            //sb.append("Language__c, Caller_Caregiver_Name__c, Caller_Caregiver_Phone__c, ");
+            sb.append("Project_Status__c, Health_Insurance_Provider__c, ");
             sb.append("Primary_Diagnosis__c, Do_you_have_a_primary_care_doctor__c, ");
             sb.append("Recent_Hospitalizations_in_past_6_mo__c, Have_you_had_recent_falls_in_past_6_mo__c ");
     		sb.append("FROM Program__c ");
@@ -215,12 +226,12 @@ public class SfUtils {
     				pi.docSubmitted = (String)s.getField("Documentation_Submitted__c");
     				//log.info("Document Submitted: " + pi.docSubmitted);
 
-    				pi.language = (String)s.getField("Language__c");
-    				log.info("Language: " + pi.language);
-    				pi.careGiverName = (String)s.getField("Caller_Caregiver_Name__c");
-    				log.info("Care Giver Name: " + pi.careGiverName);
-    				pi.careGiverPhone = (String)s.getField("Caller_Caregiver_Phone__c");
-    				log.info("Care Giver Phone: " + pi.careGiverPhone);
+    				//pi.language = (String)s.getField("Language__c");
+    				//log.info("Language: " + pi.language);
+    				//pi.careGiverName = (String)s.getField("Caller_Caregiver_Name__c");
+    				//log.info("Care Giver Name: " + pi.careGiverName);
+    				//pi.careGiverPhone = (String)s.getField("Caller_Caregiver_Phone__c");
+    				//log.info("Care Giver Phone: " + pi.careGiverPhone);
     				pi.insuranceProvider = (String)s.getField("Health_Insurance_Provider__c");
     				log.info("Insurance Provider: " + pi.insuranceProvider);
     				pi.primaryDiagnosis = (String)s.getField("Primary_Diagnosis__c");

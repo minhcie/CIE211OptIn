@@ -10,7 +10,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
@@ -434,7 +433,7 @@ public class CIE211OptIn {
             cr.insert(sqlConn);
         }
 
-        // Add/update program info.
+        // Query client programs info.
         List<SfProgramInfo> prgms = SfUtils.queryClientPrograms(connection,
                                                                 contactRecordTypeId,
                                                                 data.caseNumber);
@@ -442,12 +441,19 @@ public class CIE211OptIn {
             for (int i = 0; i < prgms.size(); i++) {
                 SfProgramInfo pi = prgms.get(i);
 
+                // Copy primary language from contact info.
+                pi.language = data.language;
+
                 // Make sure we have a valid application.
-                if (pi.appType == null || pi.appStatus == null || pi.appDate == null) {
-                    log.error("Trying to add/update program with invalid application");
+                if (pi.appType == null || pi.appDate == null) {
+                    log.error("Trying to add/update program without application type or application date");
                     continue;
                 }
 
+                // Add generic case manager.
+                TouchPointUtils.addCaseManager(sqlConn, auth, client.id, subjectId, pi);
+
+                // Add/update program info.
                 String prgmName = pi.appType.toLowerCase();
                 switch (prgmName) {
                     case "calfresh":
@@ -460,9 +466,36 @@ public class CIE211OptIn {
                         // Add client supplemental demographics.
                         TouchPointUtils.addSupplemental(sqlConn, auth, client.id, subjectId, pi);
                         break;
+                    case "health general":
+                    case "perinatal":
+                    case "project care":
+                    case "sharp referrals":
+                        // Add/update program with start date = application date,
+                        // end date = application last modified date + application
+                        // status = closed.
+                        TouchPointUtils.upsertHealthNavProgram(sqlConn, auth, client.id,
+                                                               participantId, pi);
+
+                        // Add client supplemental demographics.
+                        TouchPointUtils.addSupplemental(sqlConn, auth, client.id, subjectId, pi);
+                        break;
                     default:
                         break;
                 }
+            }
+        }
+
+        // Query client risk rating scales info.
+        List<SfProgramInfo> rrScales = SfUtils.queryRiskRatingScales(connection,
+                                                                     contactRecordTypeId,
+                                                                     data.caseNumber);
+        if (rrScales != null && rrScales.size()  > 0) {
+            for (int i = 0; i < rrScales.size(); i++) {
+                SfProgramInfo rrs = rrScales.get(i);
+
+                // Add/update risk rating scale info.
+                TouchPointUtils.addRiskRatingScale(sqlConn, auth, client.id,
+                                                   subjectId, rrs);
             }
         }
     }

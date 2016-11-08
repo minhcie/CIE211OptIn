@@ -51,15 +51,16 @@ public class TouchPointUtils {
             return programId;
         }
 
-        if (appStatus == null || appStatus.length() <= 0) {
-            log.error("Trying to get 211 SD program ID without application status");
-            return programId;
-        }
-
+        String status = "";
         String aType = appType.toLowerCase();
-        String status = appStatus.toLowerCase();
         switch (aType) {
             case "calfresh":
+                if (appStatus == null || appStatus.length() <= 0) {
+                    log.error("Trying to get CalFresh program ID without application status");
+                    return programId;
+                }
+
+                status = appStatus.toLowerCase();
                 switch (status) {
                     case "pending":
                         programId = SD211Programs.calFreshEnrollment.getValue();
@@ -71,11 +72,18 @@ public class TouchPointUtils {
                         programId = SD211Programs.calFreshApproval.getValue();
                         break;
                     default:
-                        log.error("Invalid application status: " + appStatus);
+                        log.error("Invalid application status: " + appStatus +
+                                  ", application type: CalFresh");
                         break;
                 }
                 break;
             case "combo":
+                if (appStatus == null || appStatus.length() <= 0) {
+                    log.error("Trying to get Combo program ID without application status");
+                    return programId;
+                }
+
+                status = appStatus.toLowerCase();
                 switch (status) {
                     case "pending":
                         programId = SD211Programs.comboEnrollment.getValue();
@@ -87,11 +95,18 @@ public class TouchPointUtils {
                         programId = SD211Programs.comboApproval.getValue();
                         break;
                     default:
-                        log.error("Invalid application status: " + appStatus);
+                        log.error("Invalid application status: " + appStatus +
+                                  ", application type: Combo");
                         break;
                 }
                 break;
             case "medi-cal":
+                if (appStatus == null || appStatus.length() <= 0) {
+                    log.error("Trying to get Medi-Cal program ID without application status");
+                    return programId;
+                }
+
+                status = appStatus.toLowerCase();
                 switch (status) {
                     case "pending":
                         programId = SD211Programs.mediCalEnrollment.getValue();
@@ -103,7 +118,8 @@ public class TouchPointUtils {
                         programId = SD211Programs.mediCalApproval.getValue();
                         break;
                     default:
-                        log.error("Invalid application status: " + appStatus);
+                        log.error("Invalid application status: " + appStatus +
+                                  ", application type: Medi-Cal");
                         break;
                 }
                 break;
@@ -351,9 +367,9 @@ public class TouchPointUtils {
             }
         }
 
-        // Check to see if client has been dismissed from existing enrollment.
+        // Check to see if existing enrollment has been completed.
         if (enroll.endDate != null) {
-            log.info("Client has been dismissed from ETO program id: " + programId);
+            log.info("Program enrollment (id: " + programId + ") has been completed");
             return;
         }
 
@@ -465,6 +481,189 @@ public class TouchPointUtils {
         enroll.dismissalReasonOther = reason;
         enroll.dismissalReasonId = 1; // Completed.
         enroll.update(sqlConn);
+    }
+
+
+    public static void upsertHealthNavProgram(Connection sqlConn, EtoAuthentication auth,
+                                              long clientId, long participantId,
+                                              SfProgramInfo data) throws Exception {
+        JSONObject input = new JSONObject();
+
+        // Find ETO program id from application status.
+        int programId = getProgramId(data.appType, data.appStatus);
+        if (programId == 0) {
+            log.error("ETO program id not found while trying to upsert Health-Nav program");
+            return;
+        }
+
+        // Find matching CIE program using ETO's program id.
+        DbProgram prgm = DbProgram.findByEtoProgramId(sqlConn, programId);
+        if (prgm == null) {
+            log.error("CIE Program not found while trying to upsert Health-Nav program");
+            return;
+        }
+
+        // Check to see if enrollment for this program already existed.  If not,
+        // add new program.
+        DbEnrollment enroll = DbEnrollment.findByProgram(sqlConn, clientId, prgm.id, data.appDate);
+        if (enroll == null) { // New program enrollment.
+            log.error("Program enrollment not found while trying to upsert Health-Nav program");
+
+            // Add new program before updating.
+            enroll = addProgram(sqlConn, auth, clientId, participantId, data, data.appStatus);
+            if (enroll == null) {
+                return;
+            }
+        }
+
+        // Check to see if existing enrollment has been closed.
+        if (enroll.endDate != null) {
+            log.info("Program enrollment (id: " + programId + ") has been closed");
+            return;
+        }
+
+        // Update program enrollment only if application status is closed.
+        if (data.appStatus != null && data.appStatus.length() > 0 &&
+            data.appStatus.equalsIgnoreCase("closed")) {
+            log.info("Updating existing enrollment id: " + enroll.id);
+            input.put("participantID", participantId);
+            input.put("programID", new Integer(programId));
+            long prgmEndDate = data.lastModified.getTime();
+            input.put("endDate", "/Date(" + prgmEndDate + ")/");
+            input.put("graduated", new Boolean(true));
+
+            // @debug.
+            log.info(input.toString() + "\n");
+
+            // Post request.
+            ClientResponse response = EtoServiceUtil.deleteRequest("https://services.etosoftware.com/API/Actor.svc/participant/enrollment/",
+                                                                   auth, input.toString());
+            if (response.getStatus() != 200) {
+                log.error(response.toString());
+                return;
+            }
+
+            // Update enrollment info.
+            log.info("DbEnrollment.update()");
+            enroll.endDate = data.lastModified;
+            enroll.dismissalReasonOther = "Program name: " + data.appType +
+                                          ", status: completed, closed";
+            enroll.dismissalReasonId = 1; // Completed.
+            enroll.update(sqlConn);
+        }
+    }
+
+    public static void addCaseManager(Connection sqlConn, EtoAuthentication auth,
+                                      long clientId, Long subjectId,
+                                      SfProgramInfo data) throws Exception {
+        log.info("Adding generic case manager, client id: " + clientId +
+                 ", application: " + data.appType);
+
+        // Find ETO program id from application status.
+        int programId = getProgramId(data.appType, data.appStatus);
+        if (programId == 0) {
+            log.error("ETO program id not found while trying to add case manager");
+            return;
+        }
+
+        // Find generic case manager info.
+        DbGenericCaseManager caseMgr = DbGenericCaseManager.findByProgram(sqlConn, programId);
+        if (caseMgr == null) {
+            log.error("Generic case manager for program id " + programId + " has not been configured");
+            return;
+        }
+
+        // Check to see if generic case manager has been added for given program.
+        String providerName = caseMgr.firstName + " " + caseMgr.lastName;
+        DbCareProvider cp = DbCareProvider.findByClientProviderName(sqlConn, clientId,
+                                                                    providerName);
+        if (cp != null) {
+            log.info("Generic case manager alredy existed for client id: " + clientId);
+            return;
+        }
+
+        // Find ETO entity info to populate case manager TouchPoint.
+        DbEtoEntity entity = DbEtoEntity.findByName(sqlConn, caseMgr.firstName, caseMgr.lastName);
+        if (caseMgr == null) {
+            log.error("ETO entity info has not been configured for case manager " +
+                      caseMgr.firstName + " " + caseMgr.lastName);
+            return;
+        }
+
+        // ETO Case Manager or Contact TouchPoint.
+        JSONObject input = new JSONObject();
+        input.put("TouchPointID", new Integer(17));
+        input.put("SubjectID", subjectId);
+        Date now = new Date();
+        input.put("ResponseCreatedDate", "/Date(" + now.getTime() + ")/");
+        input.put("ProgramID", new Integer(programId));
+
+        // TouchPoint response elements.
+        JSONArray respElements = new JSONArray();
+        SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yyyy");
+
+        // Case manager name.
+        JSONObject ele = new JSONObject();
+        ele.put("ElementID", new Integer(168));
+        ele.put("ElementType", new Integer(30));
+        ele.put("Value", new Long(entity.entityId)); // ETO Entity ID.
+        respElements.add(ele);
+
+        // Case management end date.
+        ele = new JSONObject();
+        ele.put("ElementID", new Integer(169));
+        ele.put("ElementType", new Integer(9));
+        ele.put("Value", null);
+        respElements.add(ele);
+
+        // Source system identifier.
+        ele = new JSONObject();
+        ele.put("ElementID", new Integer(308));
+        ele.put("ElementType", new Integer(5));
+        ele.put("Value", "211 San Diego");
+        respElements.add(ele);
+
+        // Add response elements.
+        input.put("ResponseElements", respElements);
+
+        // Wrap request JSON string.
+        String jsonStr = input.toString("TouchPointResponse", input);
+        String inputStr = "{" + jsonStr + "}";
+
+        // @debug.
+        log.info(inputStr);
+
+        // Post request.
+        ClientResponse response = EtoServiceUtil.postRequest("https://services.etosoftware.com/API/TouchPoint.svc/TouchPointResponseAdd/",
+                                                             auth, inputStr);
+        if (response.getStatus() != 200) {
+            log.error(response.toString());
+        }
+        else {
+            // Parse response.
+            Long caseMgrRespId = EtoServiceUtil.parseResponse(response, "AddTouchPointResponseResult",
+                                                              "TouchPointResponseID");
+            log.info("Case manager response ID: " + caseMgrRespId + "\n");
+        }
+
+        // Insert new CIE care provider record.
+        log.info("Inserting CIE care provider, client id: " + clientId);
+
+        // Find matching CIE program ID.
+        DbProgram ciePrgm = DbProgram.findByEtoProgramId(sqlConn, programId);
+        if (ciePrgm == null) {
+            log.error("CIE program info not found while trying to insert CIE care provider");
+            return;
+        }
+
+        cp = new DbCareProvider();
+        cp.clientId = clientId;
+        cp.programId = ciePrgm.id;
+        cp.name = providerName;
+        cp.phone = caseMgr.phone;
+        cp.email = caseMgr.email;
+        cp.startDate = data.appDate;
+        cp.insert(sqlConn);
     }
 
     public static void addSupplemental(Connection sqlConn, EtoAuthentication auth,
@@ -685,6 +884,59 @@ public class TouchPointUtils {
                                                       "TouchPointResponseID");
             log.info("Risk rating scale response ID: " + rrsId + "\n");
         }
+
+        // Add CIE risk rating scale.
+        log.info("Add CIE risk rating scale assessment");
+
+        // Get the risk rating scale assessment.  Order IMPORTANT!
+        List<DbQuestion> questions = DbQuestion.findRiskRatingAssessment(sqlConn);
+        if (questions == null || questions.size() <= 0) {
+            log.error("211 risk rating scale assessment has not been configured");
+            return;
+        }
+
+        // Activities of daily living.
+        DbQuestion q = questions.get(0);
+        saveRRSAnswer(sqlConn, clientId, q, data.dailyLiving);
+
+        // Ambulance, hospitalization.
+        q = questions.get(1);
+        saveRRSAnswer(sqlConn, clientId, q, data.ambulance);
+
+        // Health, medication management.
+        q = questions.get(2);
+        saveRRSAnswer(sqlConn, clientId, q, data.medication);
+
+        // Current living situation, housing.
+        q = questions.get(3);
+        saveRRSAnswer(sqlConn, clientId, q, data.housing);
+
+        // Income source, employment.
+        q = questions.get(4);
+        saveRRSAnswer(sqlConn, clientId, q, data.incomeEmployment);
+
+        // Nutrition, healthly food.
+        q = questions.get(5);
+        saveRRSAnswer(sqlConn, clientId, q, data.nutrition);
+
+        // Primary care provider, medical home.
+        q = questions.get(6);
+        saveRRSAnswer(sqlConn, clientId, q, data.primaryCare);
+
+        // Social support.
+        q = questions.get(7);
+        saveRRSAnswer(sqlConn, clientId, q, data.socialSupport);
+
+        // Transportation.
+        q = questions.get(8);
+        saveRRSAnswer(sqlConn, clientId, q, data.transportation);
+
+        // Save client assessment for this section.
+        DbClientAssessmentSection cas = new DbClientAssessmentSection();
+        cas.clientId = clientId;
+        cas.assessmentSectionId = q.assessmentSectionId;
+        cas.dateTaken = data.appDate;
+        cas.insert(sqlConn);
     }
 
     private static JSONObject createTextRespElement(int elementId, String respText) {
@@ -738,5 +990,34 @@ public class TouchPointUtils {
             ele.put("ResponseElementChoices", respElementChoices);
         }
         return ele;
+    }
+
+    private static void saveRRSAnswer(Connection sqlConn, long clientId,
+                                      DbQuestion q, String scaleLevel) {
+        DbAnswer ans = new DbAnswer(clientId, q.id);
+        if (scaleLevel.equalsIgnoreCase("in crisis")) {
+            ans.optionChoiceId = 30; // Must match id in option_choice table.
+            ans.insert(sqlConn);
+        }
+        else if (scaleLevel.equalsIgnoreCase("vulnerable")) {
+            ans.optionChoiceId = 31; // Must match id in option_choice table.
+            ans.insert(sqlConn);
+        }
+        else if (scaleLevel.equalsIgnoreCase("stable")) {
+            ans.optionChoiceId = 32; // Must match id in option_choice table.
+            ans.insert(sqlConn);
+        }
+        else if (scaleLevel.equalsIgnoreCase("safe")) {
+            ans.optionChoiceId = 33; // Must match id in option_choice table.
+            ans.insert(sqlConn);
+        }
+        else if (scaleLevel.equalsIgnoreCase("thriving")) {
+            ans.optionChoiceId = 34; // Must match id in option_choice table.
+            ans.insert(sqlConn);
+        }
+        else if (scaleLevel.equalsIgnoreCase("critical")) {
+            ans.optionChoiceId = 35; // Must match id in option_choice table.
+            ans.insert(sqlConn);
+        }
     }
 }

@@ -37,6 +37,7 @@ public class DbClient {
     public long etoParticipantSiteId;
     public long etoSubjectId;
     public String race;
+    public String language;
 
     public Date consentDate = null;
 
