@@ -464,7 +464,8 @@ public class CIE211OptIn {
                                                  participantId, pi);
 
                         // Add client supplemental demographics.
-                        TouchPointUtils.addSupplemental(sqlConn, auth, client.id, subjectId, pi);
+                        TouchPointUtils.addSupplemental(sqlConn, auth, client.id,
+                                                        subjectId, pi);
                         break;
                     case "health general":
                     case "perinatal":
@@ -477,7 +478,12 @@ public class CIE211OptIn {
                                                                participantId, pi);
 
                         // Add client supplemental demographics.
-                        TouchPointUtils.addSupplemental(sqlConn, auth, client.id, subjectId, pi);
+                        TouchPointUtils.addSupplemental(sqlConn, auth, client.id,
+                                                        subjectId, pi);
+
+                        // Add general health.
+                        TouchPointUtils.addGeneralHealth(sqlConn, auth, client.id,
+                                                         subjectId, pi);
                         break;
                     default:
                         break;

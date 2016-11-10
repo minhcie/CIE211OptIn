@@ -803,7 +803,7 @@ public class TouchPointUtils {
         JSONArray respElementChoices = new JSONArray();
         JSONObject choice = new JSONObject();
 
-        // Medical diagnoses.
+        // Medical diagnosis.
         respElements.add(createTextRespElement(624, data.primaryDiagnosis));
 
         // PCP/Medical home?
@@ -859,12 +859,14 @@ public class TouchPointUtils {
         ele = new JSONObject();
         ele.put("ElementID", new Integer(637));
         ele.put("ElementType", new Integer(4));
+        choice = new JSONObject();
         if (data.readmitted != null && data.readmitted.trim().length() > 0) {
             choice.put("TouchPointElementChoiceID", new Integer(1117));
         }
         else {
             choice.put("TouchPointElementChoiceID", new Integer(1118));
         }
+        respElementChoices = new JSONArray();
         respElementChoices.add(choice);
         ele.put("ResponseElementChoices", respElementChoices);
         respElements.add(ele);
@@ -901,7 +903,51 @@ public class TouchPointUtils {
         if (questions == null || questions.size() <= 0) {
             log.error("General health assessment has not been configured");
             return;
-        }    }
+        }
+
+        // PCP/Medical Home.
+        DbQuestion q = questions.get(0);
+        DbAnswer ans = new DbAnswer(clientId, q.id);
+        if (data.primaryCareProvider != null &&
+            data.primaryCareProvider.equalsIgnoreCase("yes")) {
+            ans.answerYN = true;
+        }
+        else {
+            ans.answerYN = false;
+        }
+        ans.insert(sqlConn);
+
+        // Times hospitalization last 6 months.
+        q = questions.get(1);
+        ans = new DbAnswer(clientId, q.id);
+        ans.answerText = data.timesHospital;
+        ans.insert(sqlConn);
+
+        // Times fallen last 6 months.
+        q = questions.get(2);
+        ans = new DbAnswer(clientId, q.id);
+        ans.answerText = data.timesFallen;
+        ans.insert(sqlConn);
+
+        // Re-admitted to hospital.
+        q = questions.get(3);
+        ans = new DbAnswer(clientId, q.id);
+        ans.answerText = data.readmitted;
+        ans.insert(sqlConn);
+
+        // Medical diagnosis
+        q = questions.get(4);
+        ans = new DbAnswer(clientId, q.id);
+        ans.answerText = data.primaryDiagnosis;
+        ans.insert(sqlConn);
+
+        // Save client assessment for this section.
+        DbClientAssessmentSection cas = new DbClientAssessmentSection();
+        cas.clientId = clientId;
+        cas.assessmentSectionId = q.assessmentSectionId;
+        cas.dateTaken = data.appDate;
+        cas.insert(sqlConn);
+    }
 
     public static void addRiskRatingScale(Connection sqlConn, EtoAuthentication auth,
                                           long clientId, Long subjectId,
