@@ -33,7 +33,8 @@ public class TouchPointUtils {
         healthGeneral(802),
         perinatal(803),
         projectCare(804),
-        sharpReferrals(805);
+        sharpReferrals(805),
+        riskRatingScale(806);
 
         int value;
         SD211Programs(int v) {
@@ -134,6 +135,9 @@ public class TouchPointUtils {
                 break;
             case "sharp referrals":
                 programId = SD211Programs.sharpReferrals.getValue();
+                break;
+            case "risk rating":
+                programId = SD211Programs.riskRatingScale.getValue();
                 break;
             default:
                 log.error("Invalid application type: " + appType);
@@ -769,6 +773,136 @@ public class TouchPointUtils {
         }
     }
 
+    public static void addGeneralHealth(Connection sqlConn, EtoAuthentication auth,
+                                        long clientId, Long subjectId,
+                                        SfProgramInfo data) throws Exception {
+        log.info("Adding general health, client id: " + clientId);
+
+        // Find ETO program id from application status.
+        int programId = getProgramId(data.appType, data.appStatus);
+        if (programId == 0) {
+            log.error("ETO program id not found while trying to add general health`");
+            return;
+        }
+
+        // Update session's current program before populating TouchPoint.
+        EtoServiceUtil.setCurrentProgram(programId, auth);
+
+        // ETO General Health TouchPoint.
+        JSONObject input = new JSONObject();
+        input.put("TouchPointID", new Integer(43));
+        input.put("SubjectID", subjectId);
+        Date now = new Date();
+        input.put("ResponseCreatedDate", "/Date(" + now.getTime() + ")/");
+        input.put("ProgramID", new Integer(programId));
+
+        // TouchPoint response elements.
+        JSONArray respElements = new JSONArray();
+
+        // Question (element) response choices.
+        JSONArray respElementChoices = new JSONArray();
+        JSONObject choice = new JSONObject();
+
+        // Medical diagnoses.
+        respElements.add(createTextRespElement(624, data.primaryDiagnosis));
+
+        // PCP/Medical home?
+        JSONObject ele = new JSONObject();
+        ele.put("ElementID", new Integer(628));
+        ele.put("ElementType", new Integer(4));
+        if (data.primaryCareProvider != null &&
+            data.primaryCareProvider.equalsIgnoreCase("yes")) {
+            choice.put("TouchPointElementChoiceID", new Integer(1113));
+        }
+        else {
+            choice.put("TouchPointElementChoiceID", new Integer(1114));
+        }
+        respElementChoices.add(choice);
+        ele.put("ResponseElementChoices", respElementChoices);
+        respElements.add(ele);
+
+        // Hospitalization last 6 months.
+        if (data.timesHospital != null && data.timesHospital.trim().length() > 0) {
+            ele = new JSONObject();
+            ele.put("ElementID", new Integer(635));
+            ele.put("ElementType", new Integer(6));
+            if (data.timesHospital.contains("1")) {
+                ele.put("Value", new Integer(1));
+            }
+            else if (data.timesHospital.contains("2")) {
+                ele.put("Value", new Integer(2));
+            }
+            else { // 3 or more.
+                ele.put("Value", new Integer(3));
+            }
+            respElements.add(ele);
+        }
+
+        // Fallen last 6 months.
+        if (data.timesFallen != null && data.timesFallen.trim().length() > 0) {
+            ele = new JSONObject();
+            ele.put("ElementID", new Integer(634));
+            ele.put("ElementType", new Integer(6));
+            if (data.timesFallen.contains("1")) {
+                ele.put("Value", new Integer(1));
+            }
+            else if (data.timesFallen.contains("2")) {
+                ele.put("Value", new Integer(2));
+            }
+            else { // 3 or more.
+                ele.put("Value", new Integer(3));
+            }
+            respElements.add(ele);
+        }
+
+        // Readmitted to hospital.
+        ele = new JSONObject();
+        ele.put("ElementID", new Integer(637));
+        ele.put("ElementType", new Integer(4));
+        if (data.readmitted != null && data.readmitted.trim().length() > 0) {
+            choice.put("TouchPointElementChoiceID", new Integer(1117));
+        }
+        else {
+            choice.put("TouchPointElementChoiceID", new Integer(1118));
+        }
+        respElementChoices.add(choice);
+        ele.put("ResponseElementChoices", respElementChoices);
+        respElements.add(ele);
+
+        // Add response elements.
+        input.put("ResponseElements", respElements);
+
+        // Wrap request JSON string.
+        String jsonStr = input.toString("TouchPointResponse", input);
+        String inputStr = "{" + jsonStr + "}";
+
+        // @debug.
+        log.info(inputStr);
+
+        // Post request.
+        ClientResponse response = EtoServiceUtil.postRequest("https://services.etosoftware.com/API/TouchPoint.svc/TouchPointResponseAdd/",
+                                                             auth, inputStr);
+        if (response.getStatus() != 200) {
+            log.error(response.toString());
+        }
+        else {
+            // Parse response.
+            Long respId = EtoServiceUtil.parseResponse(response, "AddTouchPointResponseResult",
+                                                       "TouchPointResponseID");
+            log.info("General health response ID: " + respId + "\n");
+        }
+
+        // Add CIE general health.
+        log.info("Add CIE general health assessment");
+
+        // Get the risk rating scale assessment.  Order IMPORTANT!
+        List<DbQuestion> questions = DbQuestion.findByAssessment(sqlConn,
+                                                                 "211 San Diego General Health Assessment");
+        if (questions == null || questions.size() <= 0) {
+            log.error("General health assessment has not been configured");
+            return;
+        }    }
+
     public static void addRiskRatingScale(Connection sqlConn, EtoAuthentication auth,
                                           long clientId, Long subjectId,
                                           SfProgramInfo data) throws Exception {
@@ -889,9 +1023,10 @@ public class TouchPointUtils {
         log.info("Add CIE risk rating scale assessment");
 
         // Get the risk rating scale assessment.  Order IMPORTANT!
-        List<DbQuestion> questions = DbQuestion.findRiskRatingAssessment(sqlConn);
+        List<DbQuestion> questions = DbQuestion.findByAssessment(sqlConn,
+                                                                 "211 San Diego Risk Rating Scale Assessment");
         if (questions == null || questions.size() <= 0) {
-            log.error("211 risk rating scale assessment has not been configured");
+            log.error("Risk rating scale assessment has not been configured");
             return;
         }
 
@@ -995,7 +1130,7 @@ public class TouchPointUtils {
     private static void saveRRSAnswer(Connection sqlConn, long clientId,
                                       DbQuestion q, String scaleLevel) {
         DbAnswer ans = new DbAnswer(clientId, q.id);
-        if (scaleLevel.equalsIgnoreCase("in crisis")) {
+        if (scaleLevel.equalsIgnoreCase("crisis")) {
             ans.optionChoiceId = 30; // Must match id in option_choice table.
             ans.insert(sqlConn);
         }

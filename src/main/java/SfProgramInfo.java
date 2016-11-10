@@ -24,6 +24,7 @@ public class SfProgramInfo {
     public String primaryCareProvider;
     public String timesHospital;
     public String timesFallen;
+    public String readmitted;
     public Date lastModified;
 
     // Risk rating scale.

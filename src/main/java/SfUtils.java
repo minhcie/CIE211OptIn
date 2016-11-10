@@ -160,7 +160,8 @@ public class SfUtils {
             //sb.append("Language__c, Caller_Caregiver_Name__c, Caller_Caregiver_Phone__c, ");
             sb.append("Project_Status__c, Health_Insurance_Provider__c, ");
             sb.append("Primary_Diagnosis__c, Do_you_have_a_primary_care_doctor__c, ");
-            sb.append("Recent_Hospitalizations_in_past_6_mo__c, Have_you_had_recent_falls_in_past_6_mo__c ");
+            sb.append("Recent_Hospitalizations_in_past_6_mo__c, Have_you_had_recent_falls_in_past_6_mo__c, ");
+            sb.append("Outcome_re_visits_30_Days__c ");
     		sb.append("FROM Program__c ");
     		sb.append("WHERE Client__r.RecordTypeId = '" + contactRecordTypeId + "' ");
     		sb.append("  AND Client__r.Id = '" + contactId + "' ");
@@ -242,6 +243,8 @@ public class SfUtils {
     				log.info("# times hospitalizations: " + pi.timesHospital);
     				pi.timesFallen = (String)s.getField("Have_you_had_recent_falls_in_past_6_mo__c");
     				log.info("# times fallen: " + pi.timesFallen);
+    				pi.readmitted = (String)s.getField("Outcome_re_visits_30_Days__c");
+    				log.info("Re-admitted: " + pi.readmitted);
 
                     // @debug.
                     /*
@@ -288,6 +291,7 @@ public class SfUtils {
                     SfProgramInfo pi = new SfProgramInfo();
                     pi.id = s.getId();
     				log.info("Id: " + pi.id);
+                    pi.appType = "risk rating";
 
     				String str = (String)s.getField("Date_of_Assessment__c");
                     if (str != null && str.trim().length() > 0) {

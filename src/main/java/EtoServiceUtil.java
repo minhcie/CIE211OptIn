@@ -132,11 +132,13 @@ public class EtoServiceUtil {
         Long responseId = null;
         String resp = response.getEntity(String.class);
 
+        /*
         // @debug.
-        //if (resp.contains("AddTouchPointResponse")) {
-        //    log.info("Response from server:");
-        //    log.info(resp + "\n");
-        //}
+        if (resp.contains("AddTouchPointResponse")) {
+            log.info("Response from server:");
+            log.info(resp + "\n");
+        }
+        */
 
         JSONParser parser = new JSONParser();
         JSONObject jsonObj = (JSONObject)parser.parse(resp);

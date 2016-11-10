@@ -485,6 +485,7 @@ public class CIE211OptIn {
             }
         }
 
+/*
         // Query client risk rating scales info.
         List<SfProgramInfo> rrScales = SfUtils.queryRiskRatingScales(connection,
                                                                      contactRecordTypeId,
@@ -498,6 +499,7 @@ public class CIE211OptIn {
                                                    subjectId, rrs);
             }
         }
+*/
     }
 
     private static void upsertEnrollmentPrograms(Connection sqlConn, EtoAuthentication auth,

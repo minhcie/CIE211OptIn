@@ -24,7 +24,7 @@ public class DbQuestion {
     public boolean required;
     public boolean allowMultipleAnswers;
 
-    public static List<DbQuestion> findRiskRatingAssessment(Connection conn) {
+    public static List<DbQuestion> findByAssessment(Connection conn, String assessmentName) {
         List<DbQuestion> results = new ArrayList<DbQuestion>();
         try {
             StringBuffer sb = new StringBuffer();
@@ -34,8 +34,8 @@ public class DbQuestion {
             sb.append("INNER JOIN assessment_section s ON s.id = q.assessmentSectionId ");
             sb.append("INNER JOIN assessment_header h ON h.id = s.assessmentHeaderId ");
             sb.append("INNER JOIN organization o ON o.id = h.organizationId ");
-            sb.append("WHERE o.id = ");
-            sb.append(ORG_ID + " ");
+            sb.append("WHERE o.id = " + ORG_ID + " ");
+            sb.append("  AND s.name = '" + assessmentName + "' ");
             sb.append("ORDER BY q.displayOrder");
 
             Statement statement = conn.createStatement();
