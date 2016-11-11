@@ -773,6 +773,73 @@ public class TouchPointUtils {
         }
     }
 
+    public static void addInsuranceProvider(Connection sqlConn, EtoAuthentication auth,
+                                            long clientId, Long subjectId,
+                                            SfProgramInfo data) throws Exception {
+        // Check to see if the same insurance provider is existed.
+        DbInsurance ins = DbInsurance.findByClientProvider(sqlConn, clientId,
+                                                           data.insuranceProvider);
+        if (ins != null) {
+            log.info("Insurance provider " + data.insuranceProvider + " is already added for client id: " + clientId);
+            return;
+        }
+
+        log.info("Adding insurance provider, client id: " + clientId);
+
+        // Find ETO program id from application status.
+        int programId = getProgramId(data.appType, data.appStatus);
+        if (programId == 0) {
+            log.error("ETO program id not found while trying to add insurance provider");
+            return;
+        }
+
+        // ETO Insurance Provider TouchPoint.
+        JSONObject input = new JSONObject();
+        input.put("TouchPointID", new Integer(44));
+        input.put("SubjectID", subjectId);
+        Date now = new Date();
+        input.put("ResponseCreatedDate", "/Date(" + now.getTime() + ")/");
+        input.put("ProgramID", new Integer(programId));
+
+        // TouchPoint response elements.
+        JSONArray respElements = new JSONArray();
+
+        // Insurance name.
+        respElements.add(createTextRespElement(651, data.insuranceProvider));
+
+        // Add response elements.
+        input.put("ResponseElements", respElements);
+
+        // Wrap request JSON string.
+        String jsonStr = input.toString("TouchPointResponse", input);
+        String inputStr = "{" + jsonStr + "}";
+
+        // @debug.
+        log.info(inputStr);
+
+        // Post request.
+        ClientResponse response = EtoServiceUtil.postRequest("https://services.etosoftware.com/API/TouchPoint.svc/TouchPointResponseAdd/",
+                                                             auth, inputStr);
+        if (response.getStatus() != 200) {
+            log.error(response.toString());
+        }
+        else {
+            // Parse response.
+            Long respId = EtoServiceUtil.parseResponse(response, "AddTouchPointResponseResult",
+                                                       "TouchPointResponseID");
+            log.info("Insurance provider response ID: " + respId + "\n");
+        }
+
+        // Add CIE insurance provider.
+        log.info("Add CIE insurance provider");
+        ins = new DbInsurance();
+        ins.clientId = clientId;
+        ins.coverageTypeId = 7; // Unknown.
+        ins.name = data.insuranceProvider;
+        ins.rank = 1;
+        ins.insert(sqlConn);
+    }
+
     public static void addGeneralHealth(Connection sqlConn, EtoAuthentication auth,
                                         long clientId, Long subjectId,
                                         SfProgramInfo data) throws Exception {
@@ -781,7 +848,7 @@ public class TouchPointUtils {
         // Find ETO program id from application status.
         int programId = getProgramId(data.appType, data.appStatus);
         if (programId == 0) {
-            log.error("ETO program id not found while trying to add general health`");
+            log.error("ETO program id not found while trying to add general health");
             return;
         }
 

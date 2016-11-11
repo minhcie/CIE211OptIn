@@ -463,20 +463,23 @@ public class CIE211OptIn {
                         upsertEnrollmentPrograms(sqlConn, auth, client.id,
                                                  participantId, pi);
 
+                        /*
                         // Add client supplemental demographics.
                         TouchPointUtils.addSupplemental(sqlConn, auth, client.id,
                                                         subjectId, pi);
+                        */
                         break;
-                    case "health general":
-                    case "perinatal":
+                    //case "health general":
+                    //case "perinatal":
                     case "project care":
-                    case "sharp referrals":
+                    //case "sharp referrals":
                         // Add/update program with start date = application date,
                         // end date = application last modified date + application
                         // status = closed.
                         TouchPointUtils.upsertHealthNavProgram(sqlConn, auth, client.id,
                                                                participantId, pi);
 
+                        /*
                         // Add client supplemental demographics.
                         TouchPointUtils.addSupplemental(sqlConn, auth, client.id,
                                                         subjectId, pi);
@@ -484,6 +487,11 @@ public class CIE211OptIn {
                         // Add general health.
                         TouchPointUtils.addGeneralHealth(sqlConn, auth, client.id,
                                                          subjectId, pi);
+                        */
+
+                        // Add insurance provider.
+                        TouchPointUtils.addInsuranceProvider(sqlConn, auth, client.id,
+                                                             subjectId, pi);
                         break;
                     default:
                         break;
