@@ -47,18 +47,20 @@ public class SfUtils {
     		sb.append("SELECT Id, FirstName, LastName, Birthdate, Gender_Identity__c, ");
     		sb.append("SSN__c, Mailing_Street__c, Mailing_Apt_Num__c, Mailing_City__c, ");
     		sb.append("Mailing_State__c, Mailing_Zip__c, Phone_1_Primary__c, Phone_2__c, ");
-    		sb.append("Email, Race__c, What_is_your_preferred_language__c, CIE_Client__c, CIE_Opt_In__c, ");
-    		sb.append("CreatedDate ");
+    		sb.append("Email, Race__c, What_is_your_preferred_language__c, CIE_Client__c, ");
+            sb.append("CIE_Opt_In__c, Test_Client__c, CreatedDate ");
     		sb.append("FROM Contact ");
     		sb.append("WHERE RecordTypeId = '" + contactRecordTypeId + "' ");
     		sb.append("  AND CIE_Client__c = TRUE ");
     		sb.append("  AND CIE_Opt_In__c = TRUE ");
-    		sb.append("  AND Id = '003d000002prhl1' "); // Sample Sue.
+    		sb.append("  AND Test_Client__c = FALSE ");
+    		//sb.append("  AND Id = '003d000002prhl1' "); // Sample Sue.
     		//sb.append("  AND Id = '003d000003ADuSG' "); // Pending test client.
     		//sb.append("  AND Id = '003d00000397Tfu' "); // Denied test client.
     		//sb.append("  AND Id = '003d000003AAIjx' "); // Approved test client.
     		//sb.append("  AND LastModifiedDate >= LAST_N_DAYS:2 ");
     		//sb.append("  AND LastModifiedDate >= YESTERDAY ");
+    		//sb.append("LIMIT 5 ");
 
     		QueryResult queryResults = conn.query(sb.toString());
     		if (queryResults.getSize() > 0) {
@@ -161,7 +163,9 @@ public class SfUtils {
             sb.append("Project_Status__c, Health_Insurance_Provider__c, ");
             sb.append("Primary_Diagnosis__c, Do_you_have_a_primary_care_doctor__c, ");
             sb.append("Recent_Hospitalizations_in_past_6_mo__c, Have_you_had_recent_falls_in_past_6_mo__c, ");
-            sb.append("Outcome_re_visits_30_Days__c ");
+            sb.append("Outcome_re_visits_30_Days__c, Transferring_Mobility__c, ");
+            sb.append("Safety__c, Housework__c, Meal_Prep_Nutrition__c, Money_Mgmt_Legal__c, ");
+            sb.append("Specialty_Healthcare_Access__c, Home_Lawn_Maintenance_Repair__c ");
     		sb.append("FROM Program__c ");
     		sb.append("WHERE Client__r.RecordTypeId = '" + contactRecordTypeId + "' ");
     		sb.append("  AND Client__r.Id = '" + contactId + "' ");
@@ -234,17 +238,31 @@ public class SfUtils {
     				//pi.careGiverPhone = (String)s.getField("Caller_Caregiver_Phone__c");
     				//log.info("Care Giver Phone: " + pi.careGiverPhone);
     				pi.insuranceProvider = (String)s.getField("Health_Insurance_Provider__c");
-    				log.info("Insurance Provider: " + pi.insuranceProvider);
+    				log.info("Insurance provider: " + pi.insuranceProvider);
     				pi.primaryDiagnosis = (String)s.getField("Primary_Diagnosis__c");
     				log.info("Diagnosis: " + pi.primaryDiagnosis);
     				pi.primaryCareProvider = (String)s.getField("Do_you_have_a_primary_care_doctor__c");
-    				log.info("Care Provider: " + pi.primaryCareProvider);
+    				log.info("Care provider: " + pi.primaryCareProvider);
     				pi.timesHospital = (String)s.getField("Recent_Hospitalizations_in_past_6_mo__c");
     				log.info("# times hospitalizations: " + pi.timesHospital);
     				pi.timesFallen = (String)s.getField("Have_you_had_recent_falls_in_past_6_mo__c");
     				log.info("# times fallen: " + pi.timesFallen);
     				pi.readmitted = (String)s.getField("Outcome_re_visits_30_Days__c");
     				log.info("Re-admitted: " + pi.readmitted);
+    				pi.mobility = (String)s.getField("Transferring_Mobility__c");
+    				log.info("Transferring/mobility: " + pi.mobility);
+    				pi.safety = (String)s.getField("Safety__c");
+    				log.info("Safety: " + pi.safety);
+    				pi.housework = (String)s.getField("Housework__c");
+    				log.info("Housework: " + pi.housework);
+    				pi.mealPrep = (String)s.getField("Meal_Prep_Nutrition__c");
+    				log.info("Meal prep/nutrition: " + pi.mealPrep);
+    				pi.moneyMgmt = (String)s.getField("Money_Mgmt_Legal__c");
+    				log.info("Money management: " + pi.moneyMgmt);
+    				pi.healthcareAccess = (String)s.getField("Specialty_Healthcare_Access__c");
+    				log.info("Specialty healthcare access: " + pi.healthcareAccess);
+    				pi.homeRepair = (String)s.getField("Home_Lawn_Maintenance_Repair__c");
+    				log.info("Home maintenance repair: " + pi.homeRepair);
 
                     // @debug.
                     /*

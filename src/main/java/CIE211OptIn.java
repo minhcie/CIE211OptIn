@@ -296,7 +296,10 @@ public class CIE211OptIn {
         cust = new JSONObject();
         cust.put("CDID", new Integer(3759));
         cust.put("CharacteristicType", new Integer(4));
-        String race = data.race.toLowerCase();
+        String race = "";
+        if (data.race != null) {
+            race = data.race.toLowerCase();
+        }
         if (race.contains("caucasian") || race.contains("white") ||
             race.contains("non-hispanic") || race.contains("non-latino") ||
             race.contains("african american") || race.contains("black") ||
@@ -463,35 +466,45 @@ public class CIE211OptIn {
                         upsertEnrollmentPrograms(sqlConn, auth, client.id,
                                                  participantId, pi);
 
-                        /*
                         // Add client supplemental demographics.
                         TouchPointUtils.addSupplemental(sqlConn, auth, client.id,
                                                         subjectId, pi);
-                        */
                         break;
-                    //case "health general":
-                    //case "perinatal":
+                    case "health general":
+                    case "perinatal":
+                    case "sharp referrals":
                     case "project care":
-                    //case "sharp referrals":
                         // Add/update program with start date = application date,
                         // end date = application last modified date + application
                         // status = closed.
                         TouchPointUtils.upsertHealthNavProgram(sqlConn, auth, client.id,
                                                                participantId, pi);
 
-                        /*
                         // Add client supplemental demographics.
                         TouchPointUtils.addSupplemental(sqlConn, auth, client.id,
                                                         subjectId, pi);
 
                         // Add general health.
-                        TouchPointUtils.addGeneralHealth(sqlConn, auth, client.id,
-                                                         subjectId, pi);
-                        */
+                        if (pi.primaryDiagnosis != null || pi.primaryCareProvider != null ||
+                            pi.timesHospital != null || pi.timesFallen != null ||
+                            pi.readmitted != null) {
+                            TouchPointUtils.addGeneralHealth(sqlConn, auth, client.id,
+                                                             subjectId, pi);
+                        }
 
                         // Add insurance provider.
-                        TouchPointUtils.addInsuranceProvider(sqlConn, auth, client.id,
+                        if (pi.insuranceProvider != null) {
+                            TouchPointUtils.addInsuranceProvider(sqlConn, auth, client.id,
+                                                                 subjectId, pi);
+                        }
+
+                        // Add ADL/IADL assessments.
+                        if (pi.mobility != null || pi.safety != null || pi.housework != null ||
+                            pi.mealPrep != null || pi.moneyMgmt != null || pi.homeRepair != null ||
+                            pi.healthcareAccess != null) {
+                            TouchPointUtils.addADLAssessment(sqlConn, auth, client.id,
                                                              subjectId, pi);
+                        }
                         break;
                     default:
                         break;
@@ -499,7 +512,6 @@ public class CIE211OptIn {
             }
         }
 
-/*
         // Query client risk rating scales info.
         List<SfProgramInfo> rrScales = SfUtils.queryRiskRatingScales(connection,
                                                                      contactRecordTypeId,
@@ -513,7 +525,6 @@ public class CIE211OptIn {
                                                    subjectId, rrs);
             }
         }
-*/
     }
 
     private static void upsertEnrollmentPrograms(Connection sqlConn, EtoAuthentication auth,

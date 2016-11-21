@@ -37,4 +37,13 @@ public class SfProgramInfo {
     public String ambulance;
     public String incomeEmployment;
     public String transportation;
+
+    // Activities of daily living.
+    public String mobility;
+    public String safety;
+    public String housework;
+    public String mealPrep;
+    public String moneyMgmt;
+    public String healthcareAccess;
+    public String homeRepair;
 }

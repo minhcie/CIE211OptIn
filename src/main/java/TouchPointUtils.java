@@ -362,7 +362,7 @@ public class TouchPointUtils {
         // add new program.
         DbEnrollment enroll = DbEnrollment.findByProgram(sqlConn, clientId, prgm.id, data.appDate);
         if (enroll == null) { // New program enrollment.
-            log.error("Program enrollment not found while trying to update");
+            log.info("Program enrollment not found while trying to update program");
 
             // Add new program before updating.
             enroll = addProgram(sqlConn, auth, clientId, participantId, data, appStatus);
@@ -511,7 +511,7 @@ public class TouchPointUtils {
         // add new program.
         DbEnrollment enroll = DbEnrollment.findByProgram(sqlConn, clientId, prgm.id, data.appDate);
         if (enroll == null) { // New program enrollment.
-            log.error("Program enrollment not found while trying to upsert Health-Nav program");
+            log.info("Program enrollment not found while trying to upsert Health-Nav program");
 
             // Add new program before updating.
             enroll = addProgram(sqlConn, auth, clientId, participantId, data, data.appStatus);
@@ -1016,6 +1016,175 @@ public class TouchPointUtils {
         cas.insert(sqlConn);
     }
 
+    public static void addADLAssessment(Connection sqlConn, EtoAuthentication auth,
+                                        long clientId, Long subjectId,
+                                        SfProgramInfo data) throws Exception {
+        log.info("Adding ADL assessment, client id: " + clientId);
+
+        // Find ETO program id from application status.
+        int programId = getProgramId(data.appType, data.appStatus);
+        if (programId == 0) {
+            log.error("ETO program id not found while trying to add general health");
+            return;
+        }
+
+        // Update session's current program before populating TouchPoint.
+        EtoServiceUtil.setCurrentProgram(programId, auth);
+
+        // ETO ADL/IADL Assessment TouchPoint.
+        SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yyyy");
+        JSONObject input = new JSONObject();
+        input.put("TouchPointID", new Integer(33));
+        input.put("SubjectID", new Long(subjectId));
+        Date now = new Date();
+        input.put("ResponseCreatedDate", "/Date(" + now.getTime() + ")/");
+        input.put("ProgramID", new Integer(programId));
+
+        // TouchPoint response elements.
+        JSONArray respElements = new JSONArray();
+
+        int[] choices = new int[] {977, 978, 979, 980, 981}; // Transferring.
+        respElements.add(createAdlRespElement(477, data.mobility, choices));
+
+        choices = new int[] {982, 983, 984, 985, 986}; // Bathing.
+        respElements.add(createAdlRespElement(478, data.safety, choices));
+
+        choices = new int[] {997, 998, 999, 1000, 1001}; // Walking.
+        respElements.add(createAdlRespElement(481, data.mobility, choices));
+
+        choices = new int[] {1002, 1003, 1004, 1005, 1006}; // Light housework.
+        respElements.add(createAdlRespElement(482, data.housework, choices));
+
+        choices = new int[] {1007, 1008, 1009, 1010, 1011}; // Laundry.
+        respElements.add(createAdlRespElement(483, data.housework, choices));
+
+        choices = new int[] {1017, 1018, 1019, 1020, 1021}; // Meal prep, cleanup.
+        respElements.add(createAdlRespElement(485, data.mealPrep, choices));
+
+        choices = new int[] {1022, 1023, 1024, 1025, 1026}; // Transportation.
+        respElements.add(createAdlRespElement(486, data.safety, choices));
+
+        choices = new int[] {1032, 1033, 1034, 1035, 1036}; // Manage medications.
+        respElements.add(createAdlRespElement(488, data.healthcareAccess, choices));
+
+        choices = new int[] {1037, 1038, 1039, 1040, 1041}; // Manage money.
+        respElements.add(createAdlRespElement(489, data.moneyMgmt, choices));
+
+        choices = new int[] {1042, 1043, 1044, 1045, 1046}; // Stair climbing.
+        respElements.add(createAdlRespElement(490, data.safety, choices));
+
+        choices = new int[] {1057, 1058, 1059, 1060, 1061}; // Heavy housework.
+        respElements.add(createAdlRespElement(493, data.homeRepair, choices));
+
+        JSONObject ele = new JSONObject();
+        ele.put("ElementID", new Integer(496)); // Date taken.
+        ele.put("ElementType", new Integer(9));
+        if (data.appDate != null) {
+            ele.put("Value", sdf.format(data.appDate));
+        }
+        else {
+            ele.put("Value", null);
+        }
+        respElements.add(ele);
+
+        // Add response elements.
+        input.put("ResponseElements", respElements);
+
+        // Wrap request JSON string.
+        String jsonStr = input.toString("TouchPointResponse", input);
+        String inputStr = "{" + jsonStr + "}";
+
+        // @debug.
+        log.info(inputStr);
+
+        // Post request.
+        ClientResponse response = EtoServiceUtil.postRequest("https://services.etosoftware.com/API/TouchPoint.svc/TouchPointResponseAdd/",
+                                                             auth, inputStr);
+        if (response.getStatus() != 200) {
+            log.error(response.toString());
+        }
+        else {
+            // Parse response.
+            Long adlRespId = EtoServiceUtil.parseResponse(response, "AddTouchPointResponseResult",
+                                                          "TouchPointResponseID");
+            log.info("ADL/IADL assessment response ID: " + adlRespId + "\n");
+        }
+
+        // Add/update CIE ADL assessment.
+        log.info("Add/Update CIE ADL assessment\n");
+
+        // Note that it is very important to configure the number of questions
+        // in CIE database to match the number of questions in ETO TouchPoint.
+        int totalScore = 0;
+        List<DbQuestion> questions = DbQuestion.findByAssessment(sqlConn,
+                                                                 "211 Health Navigation ADL Assessment");
+        if (questions != null && questions.size() > 0) {
+            DbQuestion q = questions.get(0); // Bathing.
+            totalScore += saveAdlAnswer(sqlConn, clientId, q, data.safety);
+
+            q = questions.get(1); // Stair climbing.
+            totalScore += saveAdlAnswer(sqlConn, clientId, q, data.safety);
+
+            q = questions.get(7); // Transferring.
+            totalScore += saveAdlAnswer(sqlConn, clientId, q, data.mobility);
+
+            q = questions.get(8); // Walking.
+            totalScore += saveAdlAnswer(sqlConn, clientId, q, data.mobility);
+
+            // Save client assessment for this section.
+            DbClientAssessmentSection cas = new DbClientAssessmentSection();
+            cas.clientId = clientId;
+            cas.assessmentSectionId = q.assessmentSectionId;
+            cas.dateTaken = data.appDate;
+            cas.totalScore = totalScore;
+            cas.insert(sqlConn);
+        }
+        else {
+            log.info("211 Health Navigation ADL assessment has not been configured in CIE database");
+        }
+
+        // Add/update CIE ADL assessment.
+        log.info("Add/Update CIE IADL assessment\n");
+
+        // Note that it is very important to configure the number of questions
+        // in CIE database to match the number of questions in ETO TouchPoint.
+        totalScore = 0;
+        questions = DbQuestion.findByAssessment(sqlConn, "211 Health Navigation IADL Assessment");
+        if (questions != null && questions.size() > 0) {
+            DbQuestion q = questions.get(0); // Heavy housework.
+            totalScore += saveAdlAnswer(sqlConn, clientId, q, data.homeRepair);
+
+            q = questions.get(1); // Laundry.
+            totalScore += saveAdlAnswer(sqlConn, clientId, q, data.housework);
+
+            q = questions.get(2); // Light house work.
+            totalScore += saveAdlAnswer(sqlConn, clientId, q, data.housework);
+
+            q = questions.get(3); // Manage medications.
+            totalScore += saveAdlAnswer(sqlConn, clientId, q, data.healthcareAccess);
+
+            q = questions.get(4); // Meal prep/cleanup.
+            totalScore += saveAdlAnswer(sqlConn, clientId, q, data.mealPrep);
+
+            q = questions.get(6); // Manage money.
+            totalScore += saveAdlAnswer(sqlConn, clientId, q, data.moneyMgmt);
+
+            q = questions.get(9); // Transportation.
+            totalScore += saveAdlAnswer(sqlConn, clientId, q, data.safety);
+
+            // Save client assessment for this section.
+            DbClientAssessmentSection cas = new DbClientAssessmentSection();
+            cas.clientId = clientId;
+            cas.assessmentSectionId = q.assessmentSectionId;
+            cas.dateTaken = data.appDate;
+            cas.totalScore = totalScore;
+            cas.insert(sqlConn);
+        }
+        else {
+            log.info("211 Health Navigation IADL assessment has not been configured in CIE database");
+        }
+    }
+
     public static void addRiskRatingScale(Connection sqlConn, EtoAuthentication auth,
                                           long clientId, Long subjectId,
                                           SfProgramInfo data) throws Exception {
@@ -1195,6 +1364,58 @@ public class TouchPointUtils {
         return ele;
     }
 
+    private static JSONObject createAdlRespElement(int elementId, String respText, int[] choices) {
+        JSONObject ele = new JSONObject();
+        ele.put("ElementID", new Integer(elementId));
+        ele.put("ElementType", new Integer(4));
+        if (respText.length() > 0) {
+            JSONArray respElementChoices = setAdlResponse(respText, choices);
+            ele.put("ResponseElementChoices", respElementChoices);
+        }
+        else {
+            ele.put("ResponseElementChoices", null);
+        }
+        return ele;
+    }
+
+    private static JSONArray setAdlResponse(String funcLevel, int[] choices) {
+        if (choices.length < 5) {
+            log.error("Invalid ADL/IADL choices");
+            return null;
+        }
+
+        JSONArray respElementChoices = new JSONArray();
+        JSONObject choice = new JSONObject();
+
+        if (funcLevel == null || funcLevel.length() <= 0) {
+            choice.put("TouchPointElementChoiceID", null);
+            respElementChoices.add(choice);
+            return respElementChoices;
+        }
+
+        String str = funcLevel.toLowerCase();
+        if (str.contains("independent")) {
+            choice.put("TouchPointElementChoiceID", new Integer(choices[4]));
+        }
+        else if (str.contains("verbal")) {
+            choice.put("TouchPointElementChoiceID", new Integer(choices[3]));
+        }
+        else if (str.contains("stand by")) {
+            choice.put("TouchPointElementChoiceID", new Integer(choices[2]));
+        }
+        else if (str.contains("hands on")) {
+            choice.put("TouchPointElementChoiceID", new Integer(choices[1]));
+        }
+        else if (str.contains("dependent")) {
+            choice.put("TouchPointElementChoiceID", new Integer(choices[0]));
+        }
+        else {
+            choice.put("TouchPointElementChoiceID", null);
+        }
+        respElementChoices.add(choice);
+        return respElementChoices;
+    }
+
     private static JSONObject createRiskRatingRespElement(int elementId,
                                                           int thrivingChoiceId,
                                                           String respText) {
@@ -1242,6 +1463,11 @@ public class TouchPointUtils {
 
     private static void saveRRSAnswer(Connection sqlConn, long clientId,
                                       DbQuestion q, String scaleLevel) {
+        // Make sure risk rating scale is not null.
+        if (scaleLevel == null || scaleLevel.trim().length() <= 0) {
+            return;
+        }
+
         DbAnswer ans = new DbAnswer(clientId, q.id);
         if (scaleLevel.equalsIgnoreCase("crisis")) {
             ans.optionChoiceId = 30; // Must match id in option_choice table.
@@ -1267,5 +1493,43 @@ public class TouchPointUtils {
             ans.optionChoiceId = 35; // Must match id in option_choice table.
             ans.insert(sqlConn);
         }
+    }
+
+    private static int saveAdlAnswer(Connection sqlConn, long clientId,
+                                     DbQuestion q, String funcLevel) {
+        int score = 0;
+
+        // Make sure functioning scale is not null.
+        if (funcLevel == null || funcLevel.trim().length() <= 0) {
+            return score;
+        }
+
+        String func = funcLevel.toLowerCase();
+        DbAnswer ans = new DbAnswer(clientId, q.id);
+        if (func.contains("independent")) {
+            ans.optionChoiceId = 3; // Must match id in option_choice table.
+            ans.insert(sqlConn);
+        }
+        else if (func.contains("verbal")) {
+            score = 1;
+            ans.optionChoiceId = 4; // Must match id in option_choice table.
+            ans.insert(sqlConn);
+        }
+        else if (func.contains("stand by")) {
+            score = 1;
+            ans.optionChoiceId = 5; // Must match id in option_choice table.
+            ans.insert(sqlConn);
+        }
+        else if (func.contains("hands on")) {
+            score = 1;
+            ans.optionChoiceId = 6; // Must match id in option_choice table.
+            ans.insert(sqlConn);
+        }
+        else if (func.contains("dependent")) {
+            score = 1;
+            ans.optionChoiceId = 7; // Must match id in option_choice table.
+            ans.insert(sqlConn);
+        }
+        return score;
     }
 }
