@@ -154,7 +154,7 @@ public class DbEnrollment {
             sb.append("dismissalReasonId, dismissalReasonOther ");
             sb.append("FROM enrollment ");
             sb.append("WHERE clientId = " + clientId);
-            sb.append("  AND endDate IS NULL");
+            sb.append("  AND endDate IS NULL ");
 
             Statement statement = conn.createStatement();
             ResultSet rs = statement.executeQuery(sb.toString());

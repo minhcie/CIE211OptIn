@@ -58,8 +58,9 @@ public class SfUtils {
     		//sb.append("  AND Id = '003d000003ADuSG' "); // Pending test client.
     		//sb.append("  AND Id = '003d00000397Tfu' "); // Denied test client.
     		//sb.append("  AND Id = '003d000003AAIjx' "); // Approved test client.
+    		//sb.append("  AND Id = '003d00000398jA7' "); // Combo Approved test client.
     		//sb.append("  AND LastModifiedDate >= LAST_N_DAYS:2 ");
-    		//sb.append("  AND LastModifiedDate >= YESTERDAY ");
+    		sb.append("  AND LastModifiedDate >= YESTERDAY ");
     		//sb.append("LIMIT 5 ");
 
     		QueryResult queryResults = conn.query(sb.toString());
@@ -169,6 +170,7 @@ public class SfUtils {
     		sb.append("FROM Program__c ");
     		sb.append("WHERE Client__r.RecordTypeId = '" + contactRecordTypeId + "' ");
     		sb.append("  AND Client__r.Id = '" + contactId + "' ");
+            sb.append("ORDER BY Application_Date__c ");
 
     		QueryResult queryResults = conn.query(sb.toString());
     		if (queryResults.getSize() > 0) {

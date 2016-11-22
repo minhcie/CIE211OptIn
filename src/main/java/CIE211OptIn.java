@@ -530,6 +530,11 @@ public class CIE211OptIn {
     private static void upsertEnrollmentPrograms(Connection sqlConn, EtoAuthentication auth,
                                                  long clientId, long participantId,
                                                  SfProgramInfo pi) throws Exception {
+        if (pi.appStatus == null) {
+            log.error("Enrollment program status is null");
+            return;
+        }
+
         DbEnrollment enroll = null;
         String appStatus = pi.appStatus.toLowerCase();
         switch (appStatus) {
@@ -560,6 +565,13 @@ public class CIE211OptIn {
                 // date, end date = application last modified date.
                 TouchPointUtils.updateProgram(sqlConn, auth, clientId,
                                               participantId, pi, "pending");
+
+                // Close all older open enrollments.
+                enroll = DbEnrollment.findOpenEnrollment(sqlConn, clientId);
+                if (enroll != null) {
+                    TouchPointUtils.updateProgram(sqlConn, auth, clientId,
+                                                  participantId, pi, "approved");
+                }
 
                 // Add approved program with start date = beginning date
                 // of aid (BDA), end date = null.

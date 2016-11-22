@@ -467,6 +467,10 @@ public class TouchPointUtils {
                 input.put("reasonID", new Integer(732));
             }
         }
+        else if (appStatus.equalsIgnoreCase("approved")) {
+            reason = "Completed, closed";
+            input.put("reasonID", new Integer(426));
+        }
 
         // @debug.
         log.info(input.toString() + "\n");
@@ -1368,7 +1372,7 @@ public class TouchPointUtils {
         JSONObject ele = new JSONObject();
         ele.put("ElementID", new Integer(elementId));
         ele.put("ElementType", new Integer(4));
-        if (respText.length() > 0) {
+        if (respText != null && respText.length() > 0) {
             JSONArray respElementChoices = setAdlResponse(respText, choices);
             ele.put("ResponseElementChoices", respElementChoices);
         }
