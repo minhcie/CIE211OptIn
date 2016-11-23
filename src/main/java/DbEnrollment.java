@@ -144,17 +144,19 @@ public class DbEnrollment {
         return result;
     }
 
-    public static DbEnrollment findOpenEnrollment(Connection conn, long clientId) {
+    public static DbEnrollment findApprovedOpenEnrollment(Connection conn, long clientId) {
         DbEnrollment result = null;
         try {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
 
             StringBuffer sb = new StringBuffer();
-            sb.append("SELECT id, clientId, programId, startDate, endDate, ");
-            sb.append("dismissalReasonId, dismissalReasonOther ");
-            sb.append("FROM enrollment ");
-            sb.append("WHERE clientId = " + clientId);
-            sb.append("  AND endDate IS NULL ");
+            sb.append("SELECT e.id, e.clientId, e.programId, e.startDate, e.endDate, ");
+            sb.append("e.dismissalReasonId, e.dismissalReasonOther ");
+            sb.append("FROM enrollment e ");
+            sb.append("INNER JOIN program p ON p.id = e.programId ");
+            sb.append("WHERE p.id IN (116, 119, 122)"); // CalFresh/Combo/MediCal approved.
+            sb.append("  AND e.clientId = " + clientId);
+            sb.append("  AND e.endDate IS NULL");
 
             Statement statement = conn.createStatement();
             ResultSet rs = statement.executeQuery(sb.toString());

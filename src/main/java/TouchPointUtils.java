@@ -304,7 +304,8 @@ public class TouchPointUtils {
         }
 
         // Add new program enrollment.
-        log.info("Adding new program (Client ID: " + clientId + ", ETO program ID: " + programId);
+        log.info("Adding new program (Client ID: " + clientId + ", ETO program ID: " +
+                 programId + ", Status: " + appStatus);
         JSONObject input = new JSONObject();
         input.put("participantID", participantId);
         input.put("programID", new Integer(programId));

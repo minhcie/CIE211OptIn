@@ -54,6 +54,7 @@ public class SfUtils {
     		sb.append("  AND CIE_Client__c = TRUE ");
     		sb.append("  AND CIE_Opt_In__c = TRUE ");
     		sb.append("  AND Test_Client__c = FALSE ");
+    		//sb.append("  AND Id = '003d000002w4JdJ' "); // Test client.
     		//sb.append("  AND Id = '003d000002prhl1' "); // Sample Sue.
     		//sb.append("  AND Id = '003d000003ADuSG' "); // Pending test client.
     		//sb.append("  AND Id = '003d00000397Tfu' "); // Denied test client.
@@ -170,7 +171,7 @@ public class SfUtils {
     		sb.append("FROM Program__c ");
     		sb.append("WHERE Client__r.RecordTypeId = '" + contactRecordTypeId + "' ");
     		sb.append("  AND Client__r.Id = '" + contactId + "' ");
-            sb.append("ORDER BY Application_Date__c ");
+            sb.append("ORDER BY Application_Date__c DESC ");
 
     		QueryResult queryResults = conn.query(sb.toString());
     		if (queryResults.getSize() > 0) {
@@ -181,13 +182,21 @@ public class SfUtils {
     				log.info("Id: " + pi.id);
 
     				String recType = (String)s.getChild("RecordType").getField("Name");
-                    if (recType.equalsIgnoreCase("application")) { // CalFresh, Medi-Cal.
+                    if (recType != null && recType.equalsIgnoreCase("application")) { // CalFresh, Medi-Cal.
                         pi.appType = (String)s.getField("Application_Type__c");
                         pi.appStatus = (String)s.getField("Application_Status__c");
                     }
-                    else { // Health Nav programs.
-                        pi.appType = recType;
-                        pi.appStatus = (String)s.getField("Project_Status__c");
+                    else {
+                        String appType = (String)s.getField("Application_Type__c");
+                        if (appType != null && appType.equalsIgnoreCase("calfresh")) {
+                            pi.appType = appType;
+                            pi.appStatus = (String)s.getField("Application_Status__c");
+                        }
+                        else {
+                            // Health Nav programs.
+                            pi.appType = recType;
+                            pi.appStatus = (String)s.getField("Project_Status__c");
+                        }
                     }
 				    log.info("App Type: " + pi.appType);
     				log.info("App Status: " + pi.appStatus);

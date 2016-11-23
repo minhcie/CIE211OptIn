@@ -467,8 +467,10 @@ public class CIE211OptIn {
                                                  participantId, pi);
 
                         // Add client supplemental demographics.
+                        /*
                         TouchPointUtils.addSupplemental(sqlConn, auth, client.id,
                                                         subjectId, pi);
+                        */
                         break;
                     case "health general":
                     case "perinatal":
@@ -480,6 +482,7 @@ public class CIE211OptIn {
                         TouchPointUtils.upsertHealthNavProgram(sqlConn, auth, client.id,
                                                                participantId, pi);
 
+                        /*
                         // Add client supplemental demographics.
                         TouchPointUtils.addSupplemental(sqlConn, auth, client.id,
                                                         subjectId, pi);
@@ -505,6 +508,7 @@ public class CIE211OptIn {
                             TouchPointUtils.addADLAssessment(sqlConn, auth, client.id,
                                                              subjectId, pi);
                         }
+                        */
                         break;
                     default:
                         break;
@@ -513,6 +517,7 @@ public class CIE211OptIn {
         }
 
         // Query client risk rating scales info.
+        /*
         List<SfProgramInfo> rrScales = SfUtils.queryRiskRatingScales(connection,
                                                                      contactRecordTypeId,
                                                                      data.caseNumber);
@@ -525,6 +530,7 @@ public class CIE211OptIn {
                                                    subjectId, rrs);
             }
         }
+        */
     }
 
     private static void upsertEnrollmentPrograms(Connection sqlConn, EtoAuthentication auth,
@@ -566,8 +572,8 @@ public class CIE211OptIn {
                 TouchPointUtils.updateProgram(sqlConn, auth, clientId,
                                               participantId, pi, "pending");
 
-                // Close all older open enrollments.
-                enroll = DbEnrollment.findOpenEnrollment(sqlConn, clientId);
+                // Close older approved open enrollments.
+                enroll = DbEnrollment.findApprovedOpenEnrollment(sqlConn, clientId);
                 if (enroll != null) {
                     TouchPointUtils.updateProgram(sqlConn, auth, clientId,
                                                   participantId, pi, "approved");
