@@ -52,7 +52,7 @@ public class SfUtils {
     		sb.append("FROM Contact ");
     		sb.append("WHERE RecordTypeId = '" + contactRecordTypeId + "' ");
     		sb.append("  AND CIE_Client__c = TRUE ");
-    		sb.append("  AND CIE_Opt_In__c = TRUE ");
+    		sb.append("  AND (CIE_Opt_In__c = TRUE OR Consent_into_CIE__c = 'Yes') ");
     		sb.append("  AND Test_Client__c = FALSE ");
     		//sb.append("  AND Id = '003d000002w4JdJ' "); // Test client.
     		//sb.append("  AND Id = '003d000002prhl1' "); // Sample Sue.
