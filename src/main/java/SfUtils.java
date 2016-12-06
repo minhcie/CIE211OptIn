@@ -118,10 +118,17 @@ public class SfUtils {
                     c.race = (String)s.getField("Race__c");
                     c.language = (String)s.getField("What_is_your_preferred_language__c");
 
+                    /*
                     str = (String)s.getField("CreatedDate");
                     if (str != null && str.trim().length() > 0) {
                         c.consentDate = sdf.parse(str);
                     }
+                    */
+
+                    // Set consent date to yesterday instead of using CreatedDate.
+                    cal = Calendar.getInstance();
+                    cal.add(Calendar.DATE, -1);
+                    c.consentDate = cal.getTime();
 
                     // @debug.
     				log.info("Id: " + c.caseNumber);
